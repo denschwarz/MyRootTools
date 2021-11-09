@@ -1,3 +1,18 @@
+"""
+This is a plotter class. It can be used to draw CMS publication-ready plots.
+You can add three types of histograms to a plot: backgrounds, signals and data.
+Backgrounds have a name (that appears in the legend), a color, are stacked and
+appear as colored areas.
+Signals have a name (that appears in the legend) and a color and appear as
+lines in the plot.
+Data can be added only once and appears as black markers.
+Systematic uncertainties are plugged in as variaitons of single backgrounds and
+treated internally in the plotter.
+
+Some parameters can be changed in order to customize the plot. 
+"""
+
+
 import ROOT,os,sys
 from math                                import sqrt
 from tWZ.Tools.user                      import plot_directory
