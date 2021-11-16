@@ -9,7 +9,7 @@ Data can be added only once and appears as black markers.
 Systematic uncertainties are plugged in as variaitons of single backgrounds and
 treated internally in the plotter.
 
-Some parameters can be changed in order to customize the plot. 
+Some parameters can be changed in order to customize the plot.
 """
 
 
@@ -50,6 +50,7 @@ class Plotter:
         self.__data = {}                              # Hist and info of data
         self.__sysnames = []                          # Names of uncertainties
         self.__stack = ROOT.THStack()                 # Stack for backgrounds
+        self.__ymin = 0                               # minimum of any histogram
         self.__ymax = 0                               # maximum of any histogram
         self.__xmin = -1                              # min of x-axis
         self.__xmax = -1                              # max of x-axis
@@ -149,6 +150,12 @@ class Plotter:
         if not foundBackground:
             print "[Error]: Trying to add %s systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
             sys.exit(1)
+
+    ############################################################################
+    # Customize min/max of y axis
+    def setCustomYRange(self, min, max):
+        self.__ymin = min
+        self.__ymax = max
 
     ############################################################################
     # Private function to sort backgrounds by their integral, put them in a stack,
@@ -294,7 +301,7 @@ class Plotter:
         hist.GetYaxis().SetTitleOffset(1.3)
         hist.GetYaxis().SetTitleSize(0.06)
         hist.GetYaxis().SetNdivisions(505)
-        hist.GetYaxis().SetRangeUser(0., self.yfactor*self.__ymax)
+        hist.GetYaxis().SetRangeUser(self.__ymin, self.yfactor*self.__ymax)
         hist.GetXaxis().SetTickLength(0.07)
         hist.GetXaxis().SetNdivisions(505)
         if not self.drawRatio:
@@ -379,7 +386,7 @@ class Plotter:
 
         # Now draw the ratio pad
         if self.drawRatio:
-            axis = ROOT.TGaxis( self.__xmin, 0., self.__xmin, self.yfactor*self.__ymax, 0., self.yfactor*self.__ymax, 505,"")
+            axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"")
             axis.SetLabelOffset(0.01)
             axis.SetLabelFont(43)
             axis.SetLabelSize(21)
