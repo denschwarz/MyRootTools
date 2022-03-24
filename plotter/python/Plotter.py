@@ -35,7 +35,8 @@ class Plotter:
         self.ratiotitle = "#frac{Data}{SM}"         # Title of ratio
         self.drawRatio = False                      # Draw ratio?
         self.subtext = "Work in progress"           # Subtext of CMS label
-        self.lumi = "137"                           # lumi value in label
+        self.lumi = None                            # lumi value in label
+        self.log = False                            # log scale?
         self.yfactor = 1.7                          # scale y-axis
 
         # Internal parameters that are set automatically
@@ -54,11 +55,13 @@ class Plotter:
         self.__ymax = 0                               # maximum of any histogram
         self.__xmin = -1                              # min of x-axis
         self.__xmax = -1                              # max of x-axis
+        self.__NlegEntries = 0                        # number of entries in legend
 
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
     def addBackground(self, hist, legendtext, color):
         self.__hasBackground = True
+        self.__NlegEntries += 1
         bkg = {}
         bkg["name"] = legendtext
         bkg["hist"] = hist
@@ -84,6 +87,7 @@ class Plotter:
     # Add signals that are displayed as lines
     def addSignal(self, hist, legendtext, color):
         self.__hasSignal = True
+        self.__NlegEntries += 1
         sig = {}
         sig["name"] = legendtext
         sig["hist"] = hist
@@ -110,6 +114,7 @@ class Plotter:
     # Add data that are displayed with markers,
     # only one data histogram is allowed
     def addData(self, hist, legendtext="Data"):
+        self.__NlegEntries += 1
         if self.__hasData:
             print "[Error]: Cannot add Data more than once."
             sys.exit(1)
@@ -239,7 +244,7 @@ class Plotter:
         for i in range(Nbins):
             bin=i+1
             if h2.GetBinContent(bin)==0:
-                r=0
+                r=1
                 e=0
             else:
                 r = h1.GetBinContent(bin)/h2.GetBinContent(bin)
@@ -300,7 +305,10 @@ class Plotter:
         hist.GetYaxis().SetTitle(self.ytitle)
         hist.GetYaxis().SetTitleOffset(1.3)
         hist.GetYaxis().SetTitleSize(0.06)
-        hist.GetYaxis().SetNdivisions(505)
+        if not self.log:
+            hist.GetYaxis().SetNdivisions(505)
+        else:
+            hist.GetYaxis().SetNdivisions(510)
         hist.GetYaxis().SetRangeUser(self.__ymin, self.yfactor*self.__ymax)
         hist.GetXaxis().SetTickLength(0.07)
         hist.GetXaxis().SetNdivisions(505)
@@ -351,7 +359,11 @@ class Plotter:
         pad1.SetLeftMargin(0.19)
         pad1.Draw()
         pad1.cd()
-
+        if self.log:
+            self.__ymin = 0.0011*self.__ymax
+            self.yfactor *= 100
+            pad1.SetLogy()
+        self.legend = ROOT.TLegend(.6,.85-self.__NlegEntries*0.075,.8,.85)
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
             self.legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
@@ -373,8 +385,8 @@ class Plotter:
             for sig in self.__signals:
                 self.__setDrawOptions(sig["hist"])
                 self.legend.AddEntry(sig["hist"], sig["name"], "l")
-                if histdrawn: sig["hist"].Draw("SAME")
-                else:         sig["hist"].Draw("")
+                if histdrawn: sig["hist"].Draw("HIST SAME")
+                else:         sig["hist"].Draw("HIST ")
                 histdrawn = True
 
         if self.__hasData:
@@ -387,10 +399,15 @@ class Plotter:
         # Now draw the ratio pad
         if self.drawRatio:
             axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"")
+            if self.log:
+                axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"G")
             axis.SetLabelOffset(0.01)
             axis.SetLabelFont(43)
             axis.SetLabelSize(21)
             axis.SetNdivisions(505)
+            if self.log:
+                axis.SetNdivisions(510)
+
             axis.Draw()
             c.cd();
             pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
@@ -427,8 +444,9 @@ class Plotter:
         CMSlabel.Draw()
         sublabel = self.__getSubtitle()
         sublabel.Draw()
-        lumilable = self.__getLumi()
-        lumilable.Draw()
+        if self.lumi is not None:
+            lumilable = self.__getLumi()
+            lumilable.Draw()
         self.legend.Draw()
         ROOT.gPad.RedrawAxis()
 
