@@ -15,11 +15,16 @@ Some parameters can be changed in order to customize the plot.
 
 import ROOT,os,sys
 from math                                import sqrt
+from itertools                           import count
 from tWZ.Tools.user                      import plot_directory
 
 
 class Plotter:
+    _ids = count(0)
     def __init__(self, name):
+        # Keep track of instances of this class to have unique canvas names
+        self.id = next(self._ids)
+        
         # A few global drawing options
         ROOT.gStyle.SetLegendBorderSize(0)
         ROOT.gStyle.SetPadTickX(1)
@@ -38,6 +43,9 @@ class Plotter:
         self.lumi = None                            # lumi value in label
         self.log = False                            # log scale?
         self.yfactor = 1.7                          # scale y-axis
+        self.rebin = 1                              # rebin hist?
+        self.ratiorange = 0.5,1.5                   # y-range of ratio plot
+        self.legshift = (0., 0., 0., 0.)            # shift the Legend coordinates (x1, y1, x2, y2)
 
         # Internal parameters that are set automatically
         self.__bkgtotal = ROOT.TH1F()                 # Hist for sum of backgrounds
@@ -60,6 +68,8 @@ class Plotter:
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
     def addBackground(self, hist, legendtext, color):
+        if self.rebin > 1:
+            hist.Rebin(self.rebin)
         self.__hasBackground = True
         self.__NlegEntries += 1
         bkg = {}
@@ -86,11 +96,14 @@ class Plotter:
     ############################################################################
     # Add signals that are displayed as lines
     def addSignal(self, hist, legendtext, color):
+        if self.rebin > 1:
+            hist.Rebin(self.rebin)        
         self.__hasSignal = True
         self.__NlegEntries += 1
         sig = {}
         sig["name"] = legendtext
         sig["hist"] = hist
+        sig["hist"].SetFillColorAlpha(ROOT.kWhite, 0.0);
         sig["hist"].SetLineColor(color)
         sig["hist"].SetLineWidth(2)
         self.__signals.append(sig)
@@ -114,6 +127,8 @@ class Plotter:
     # Add data that are displayed with markers,
     # only one data histogram is allowed
     def addData(self, hist, legendtext="Data"):
+        if self.rebin > 1:
+            hist.Rebin(self.rebin)
         self.__NlegEntries += 1
         if self.__hasData:
             print "[Error]: Cannot add Data more than once."
@@ -144,6 +159,9 @@ class Plotter:
     ############################################################################
     # Add systematic
     def addSystematic(self, up, down, sysname, bkgname):
+        if self.rebin > 1:
+            up.Rebin(self.rebin)
+            down.Rebin(self.rebin)            
         self.__doSystematics = True
         foundBackground = False
         for bkg in self.__backgrounds:
@@ -244,7 +262,7 @@ class Plotter:
         for i in range(Nbins):
             bin=i+1
             if h2.GetBinContent(bin)==0:
-                r=1
+                r=-1
                 e=0
             else:
                 r = h1.GetBinContent(bin)/h2.GetBinContent(bin)
@@ -252,7 +270,16 @@ class Plotter:
             ratio.SetBinContent(bin,r)
             ratio.SetBinError(bin,e)
         return ratio
-
+    ############################################################################
+    # Private, create the ratio plot
+    def __getRatioLine(self, h1):
+        line = h1.Clone()
+        Nbins = line.GetSize()-2
+        for i in range(Nbins):
+            bin=i+1
+            line.SetBinContent(bin,1.0)
+            line.SetBinError(bin,0.0)
+        return line
     ############################################################################
     # Private, set options for the CMS label
     def __getCMS(self):
@@ -287,13 +314,13 @@ class Plotter:
         lumitext.SetNDC()
         lumitext.SetTextAlign(33)
         lumitext.SetTextFont(42)
-        lumitext.SetX(0.9)
+        lumitext.SetX(0.94)
         if self.drawRatio:
             lumitext.SetTextSize(0.055)
-            lumitext.SetY(0.961)
+            lumitext.SetY(0.971)
         else:
             lumitext.SetTextSize(0.0367)
-            lumitext.SetY(0.941)
+            lumitext.SetY(0.951)
         lumitext.Draw()
         return lumitext
 
@@ -325,9 +352,10 @@ class Plotter:
     ############################################################################
     # Private, set draw options for the histograms
     def __setRatioDrawOptions(self, ratio):
+        (ymin, ymax) = self.ratiorange
         ratio.SetTitle('')
         ratio.GetYaxis().SetTitle(self.ratiotitle)
-        ratio.GetYaxis().SetRangeUser(0.5, 1.5)
+        ratio.GetYaxis().SetRangeUser(ymin, ymax)
         ratio.GetYaxis().SetNdivisions(505)
         ratio.GetYaxis().CenterTitle()
         ratio.GetYaxis().SetTitleSize(22)
@@ -346,24 +374,29 @@ class Plotter:
         ratio.GetXaxis().SetLabelOffset(0.035)
         ratio.GetXaxis().SetNdivisions(505)
 
+    def getTotalSystematic(self):
+        return self.__errorhist
     ############################################################################
     # This function draws and saves the final plot.
     # It takes care of which objects exist (backgrounds, signals, data) and
     # all cosmetics are steered from here
     def draw(self):
-        c = ROOT.TCanvas("c", "c", 600, 600)
+        # c = ROOT.TCanvas("c", "c", 600, 600)
+        c = ROOT.TCanvas("c"+str(self.id), "c"+str(self.id), 600, 600)
         pady1 = 0.31 if self.drawRatio else 0.0
         pad1 = ROOT.TPad("pad1", "pad1", 0, pady1, 1, 1.0)
         if self.drawRatio: pad1.SetBottomMargin(0.02)
         else:              pad1.SetBottomMargin(0.12)
+        pad1.SetTopMargin(0.1)
         pad1.SetLeftMargin(0.19)
+        pad1.SetRightMargin(0.05)
         pad1.Draw()
         pad1.cd()
         if self.log:
             self.__ymin = 0.0011*self.__ymax
             self.yfactor *= 100
             pad1.SetLogy()
-        self.legend = ROOT.TLegend(.6,.85-self.__NlegEntries*0.075,.8,.85)
+        self.legend = ROOT.TLegend(.6+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075,.8+self.legshift[2],.85+self.legshift[3])
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
             self.legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
@@ -374,7 +407,7 @@ class Plotter:
             histdrawn = True
             self.__stack.Draw("HIST SAME")
             if self.__doSystematics:
-                self.__getTotalSystematic()
+                self.__setDrawOptions(self.__errorhist)
                 self.__errorhist.SetFillStyle(3245)
                 self.__errorhist.SetFillColor(13)
                 self.__errorhist.SetLineWidth(0)
@@ -395,7 +428,6 @@ class Plotter:
             else:         self.__data["hist"].Draw("P")
             histdrawn = True
 
-
         # Now draw the ratio pad
         if self.drawRatio:
             axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"")
@@ -409,19 +441,20 @@ class Plotter:
                 axis.SetNdivisions(510)
 
             axis.Draw()
-            c.cd();
+            c.cd()
             pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
             pad2.SetLeftMargin(0.19)
+            pad2.SetRightMargin(0.05)
             pad2.SetTopMargin(0)
             pad2.SetBottomMargin(0.38);
             pad2.Draw()
             pad2.cd()
-            ratio = self.__getRatio(self.__bkgtotal, self.__bkgtotal)
-            self.__setRatioDrawOptions(ratio)
-            ratio.SetFillColor(0)
-            ratio.SetLineColor(15)
-            ratio.SetLineWidth(2)
-            ratio.Draw("HIST")
+            ratioline = self.__getRatioLine(self.__bkgtotal)
+            self.__setRatioDrawOptions(ratioline)
+            ratioline.SetFillColor(0)
+            ratioline.SetLineColor(15)
+            ratioline.SetLineWidth(2)
+            ratioline.Draw("HIST")
             if self.__doSystematics:
                 ratio_uncert = self.__getRatio(self.__errorhist, self.__bkgtotal)
                 ratio_uncert.Draw("E2 SAME")
