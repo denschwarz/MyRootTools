@@ -49,15 +49,16 @@ class Plotter:
 
         # Internal parameters that are set automatically
         self.__bkgtotal = ROOT.TH1F()                 # Hist for sum of backgrounds
-        self.__errorhist = ROOT.TH1F()                # Hist for sys uncert
+        self.__errorhist = ROOT.TGraphAsymmErrors()   # Hist for sys uncert
         self.__hasData = False                        # Keep track if date have been added
         self.__hasSignal = False                      # Keep track if signals have been added
         self.__hasBackground = False                  # Keep track if backgrounds have been added
         self.__doSystematics = False                  # Keep track if systematics have been added
         self.__backgrounds = []                       # Hists and infos of all backgrounds
+        self.__sysDeltas = []                         # List of systematic shifts
+        self.__sysnames = []                          # List of systematic names
         self.__signals = []                           # Hists and infos of all signals
         self.__data = {}                              # Hist and info of data
-        self.__sysnames = []                          # Names of uncertainties
         self.__stack = ROOT.THStack()                 # Stack for backgrounds
         self.__ymin = 0                               # minimum of any histogram
         self.__ymax = 0                               # maximum of any histogram
@@ -167,9 +168,13 @@ class Plotter:
         for bkg in self.__backgrounds:
             if bkg["name"] == bkgname:
                 foundBackground = True
-                self.__sysnames.append(sysname)
-                bkg[sysname+"__up"] = up
-                bkg[sysname+"__down"] = down
+                deltaUp = up.Clone()
+                deltaUp.Add(bkg["hist"], -1)
+                deltaDown = down.Clone()
+                deltaDown.Add(bkg["hist"], -1)
+                
+                self.__sysDeltas.append( (sysname, bkgname, deltaUp, deltaDown) )
+                self.__sysnames.append(sysname)       
         if not foundBackground:
             print "[Error]: Trying to add %s systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
             sys.exit(1)
@@ -211,49 +216,39 @@ class Plotter:
             self.__ymax = self.__stack.GetMaximum()
 
     ############################################################################
-    # Private, add up all sys variations
+    # Private, add up all sys variations and MC stat
     # Use central for up/down if no Systematics are set
-    def __getTotalSystematic(self):
-        uphists = []
-        downhists = []
-        for sys in self.__sysnames:
-            h_up = ROOT.TH1F()
-            h_down = ROOT.TH1F()
-            for i,bkg in enumerate(self.__backgrounds):
-                if sys+"__up" in bkg.keys():
-                    if i==0:
-                        h_up = bkg[sys+"__up"].Clone()
-                        h_down = bkg[sys+"__down"].Clone()
-                    else:
-                        h_up.Add(bkg[sys+"__up"])
-                        h_down.Add(bkg[sys+"__down"])
-                else:
-                    if i==0:
-                        h_up = bkg["hist"].Clone()
-                        h_down = bkg["hist"].Clone()
-                    else:
-                        h_up.Add(bkg["hist"])
-                        h_down.Add(bkg["hist"])
-            uphists.append(h_up)
-            downhists.append(h_down)
-        self.__calculateTotalUncert(uphists, downhists)
-
-    ############################################################################
-    # Private, return a histogram with all backgrounds added and errors from the
-    # systematic variations
-    def __calculateTotalUncert(self, uphists, downhists):
-        errorhist = self.__bkgtotal.Clone()
+    def __getTotalUncertainty(self):
         Nbins = self.__bkgtotal.GetSize()-2
         for i in range(Nbins):
             bin = i+1
-            sum2 = 0
-            for j, hist in enumerate(uphists):
-                diff_up = abs(hist.GetBinContent(bin) - self.__bkgtotal.GetBinContent(bin))
-                diff_down = abs(downhists[j].GetBinContent(bin) - self.__bkgtotal.GetBinContent(bin))
-                sum2 += 0.5*(diff_up + diff_down)
-            err = errorhist.GetBinError(bin)
-            errorhist.SetBinError(bin, sqrt(sum2+err))
-        self.__errorhist = errorhist
+            bincenter = self.__bkgtotal.GetXaxis().GetBinCenter(bin)
+            bincontent = self.__bkgtotal.GetBinContent(bin)
+            self.__errorhist.SetPoint(bin, bincenter, bincontent)
+            staterr = self.__bkgtotal.GetBinError(bin)
+            totalErrSquared_up   = pow(staterr, 2)
+            totalErrSquared_down = pow(staterr, 2)
+            # Go through all uncertainties and add up shifts connected to the
+            # same sys but different backgrounds 
+            for sys in self.__sysnames:
+                shift_up = 0
+                shift_down = 0
+                for (sysname, bkgname, deltaUp, deltaDown) in self.__sysDeltas:
+                    if sys == sysname:
+                        shift_up += deltaUp.GetBinContent(bin)
+                        shift_down += deltaDown.GetBinContent(bin)
+                totalErrSquared_up += pow(shift_up, 2)
+                totalErrSquared_down += pow(shift_down, 2)
+            # if the total error is 0.0, the plotter does weird stuff, so
+            # set to super small value > 0
+            if totalErrSquared_up < pow(10, -20):
+                totalErrSquared_up = pow(10, -20)
+            if totalErrSquared_down < pow(10, -20):
+                totalErrSquared_down = pow(10, -20)
+            # Get X errors:
+            ex_low = self.__bkgtotal.GetXaxis().GetBinCenter(bin) - self.__bkgtotal.GetXaxis().GetBinLowEdge(bin)
+            ex_up =  self.__bkgtotal.GetXaxis().GetBinUpEdge(bin) - self.__bkgtotal.GetXaxis().GetBinCenter(bin)
+            self.__errorhist.SetPointError(bin, ex_low, ex_up, sqrt(totalErrSquared_down), sqrt(totalErrSquared_up))
     ############################################################################
     # Private, create the ratio plot
     def __getRatio(self, h1, h2):
@@ -269,6 +264,31 @@ class Plotter:
                 e = h1.GetBinError(bin)/h2.GetBinContent(bin)
             ratio.SetBinContent(bin,r)
             ratio.SetBinError(bin,e)
+        return ratio
+    ############################################################################
+    # Private, create the ratio uncertainty plot
+    def __getRatioUncert(self, errorgraph):
+        ratio = errorgraph.Clone()
+        Npoints = errorgraph.GetN()
+        for i in range(Npoints):
+            point=i+1
+            d1, d2 = ROOT.Double(0.), ROOT.Double(0.)
+            errorgraph.GetPoint(point, d1, d2)
+            Xval = float(d1)
+            Yval = float(d2)
+            eX_hi = errorgraph.GetErrorXhigh(point)
+            eX_lo = errorgraph.GetErrorXlow(point)
+                        
+            if Yval==0:
+                eY_hi = 0
+                eY_lo = 0    
+            else:
+                eY_hi = errorgraph.GetErrorYhigh(point)/Yval
+                eY_lo = errorgraph.GetErrorYlow(point)/Yval
+                
+            ratio.SetPoint(point, Xval, 1.0)
+            ratio.SetPointError(point, eX_lo, eX_hi, eY_lo, eY_hi)
+
         return ratio
     ############################################################################
     # Private, create the ratio plot
@@ -406,14 +426,15 @@ class Plotter:
             self.__backgrounds[0]["hist"].Draw("HIST")
             histdrawn = True
             self.__stack.Draw("HIST SAME")
-            if self.__doSystematics:
-                self.__setDrawOptions(self.__errorhist)
-                self.__errorhist.SetFillStyle(3245)
-                self.__errorhist.SetFillColor(13)
-                self.__errorhist.SetLineWidth(0)
-                self.__errorhist.SetMarkerStyle(0)
-                self.__errorhist.Draw("E2 SAME")
-                self.legend.AddEntry(self.__errorhist, "Total uncertainty","f")
+            # Uncertainty on MC
+            self.__getTotalUncertainty()
+            self.__setDrawOptions(self.__errorhist)
+            self.__errorhist.SetFillStyle(3245)
+            self.__errorhist.SetFillColor(13)
+            self.__errorhist.SetLineWidth(0)
+            self.__errorhist.SetMarkerStyle(0)
+            self.__errorhist.Draw("E2 HIST SAME")
+            self.legend.AddEntry(self.__errorhist, "Total uncertainty","f")
         if self.__hasSignal:
             for sig in self.__signals:
                 self.__setDrawOptions(sig["hist"])
@@ -455,9 +476,8 @@ class Plotter:
             ratioline.SetLineColor(15)
             ratioline.SetLineWidth(2)
             ratioline.Draw("HIST")
-            if self.__doSystematics:
-                ratio_uncert = self.__getRatio(self.__errorhist, self.__bkgtotal)
-                ratio_uncert.Draw("E2 SAME")
+            ratio_uncert = self.__getRatioUncert(self.__errorhist)
+            ratio_uncert.Draw("E2 SAME")
             if self.__hasSignal:
                 ratios_sig = []
                 for sig in self.__signals:
