@@ -104,7 +104,7 @@ class Plotter:
         sig = {}
         sig["name"] = legendtext
         sig["hist"] = hist
-        sig["hist"].SetFillColorAlpha(ROOT.kWhite, 0.0);
+        sig["hist"].SetFillColorAlpha(ROOT.kWhite, 0.0)
         sig["hist"].SetLineColor(color)
         sig["hist"].SetLineWidth(2)
         self.__signals.append(sig)
@@ -137,10 +137,10 @@ class Plotter:
         self.__hasData = True
         self.__data["name"] = legendtext
         self.__data["hist"] = hist
-        self.__data["hist"].SetLineColor(ROOT.kBlack);
-        self.__data["hist"].SetMarkerColor(ROOT.kBlack);
-        self.__data["hist"].SetMarkerStyle(8);
-        self.__data["hist"].SetMarkerSize(1);
+        self.__data["hist"].SetLineColor(ROOT.kBlack)
+        self.__data["hist"].SetMarkerColor(ROOT.kBlack)
+        self.__data["hist"].SetMarkerStyle(8)
+        self.__data["hist"].SetMarkerSize(1)
         if hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
         # Check if min and max bounds of x-axis fit other histograms
@@ -370,7 +370,7 @@ class Plotter:
             hist.GetYaxis().SetLabelSize(0.)
 
     ############################################################################
-    # Private, set draw options for the histograms
+    # Private, set draw options for the ratio
     def __setRatioDrawOptions(self, ratio):
         (ymin, ymax) = self.ratiorange
         ratio.SetTitle('')
@@ -393,6 +393,52 @@ class Plotter:
         ratio.GetXaxis().SetLabelSize(21)
         ratio.GetXaxis().SetLabelOffset(0.035)
         ratio.GetXaxis().SetNdivisions(505)
+        
+    ############################################################################
+    # Private, set draw options for the ratio that contains outside values        
+    def __setRatioOutsideDrawOptions(self, ratio):
+        # first apply usual cosmetics
+        self.__setRatioDrawOptions(ratio) 
+        # Now change marker 
+        ratio.SetMarkerSize(0)
+        
+    ############################################################################
+    # Private, get a ratio histogram that contains values outside the y range        
+    def __getRatioOutside(self, ratio):        
+        # If there are points outside the y range, the error bar is not drawn,
+        # even if it would reach into the plot-
+        # To solve this, an additional histogram is drawn
+        (ymin, ymax) = self.ratiorange
+        ratio_outside = ratio.Clone()
+        ratio_outside.Reset()
+        Nbins = ratio.GetSize()-2
+        for i in range(Nbins):
+            bin = i+1
+            central = ratio.GetBinContent(bin)
+            error = ratio.GetBinError(bin)
+            min = ratio.GetBinContent(bin)-error
+            max = ratio.GetBinContent(bin)+error
+            if central > ymax and min < ymax:
+                # if point is above y range:
+                # 1. move central value down to the edge of y range
+                # 2. make error smaller to make the error bar end at the same value as before
+                offset = central - ymax
+                central_new = central-offset
+                error_new   = error-offset
+                
+            elif central < ymin and max > ymin:
+                # if point is below y range:
+                # 1. move central value up to the edge of y range
+                # 2. make error smaller to make the error bar end at the same value as before
+                offset = ymin - central
+                central_new = central+offset
+                error_new   = error-offset
+            else:
+                central_new = 0.0
+                error_new   = 0.0
+            ratio_outside.SetBinContent(bin, central_new)
+            ratio_outside.SetBinError(bin, error_new)
+        return ratio_outside                
 
     def getTotalSystematic(self):
         return self.__errorhist
@@ -467,7 +513,7 @@ class Plotter:
             pad2.SetLeftMargin(0.19)
             pad2.SetRightMargin(0.05)
             pad2.SetTopMargin(0)
-            pad2.SetBottomMargin(0.38);
+            pad2.SetBottomMargin(0.38)
             pad2.Draw()
             pad2.cd()
             ratioline = self.__getRatioLine(self.__bkgtotal)
@@ -489,6 +535,10 @@ class Plotter:
                 ratio_data = self.__getRatio(self.__data["hist"], self.__bkgtotal)
                 self.__setRatioDrawOptions(ratio_data)
                 ratio_data.Draw("P SAME")
+                ratio_data_outside = self.__getRatioOutside(ratio_data)
+                self.__setRatioOutsideDrawOptions(ratio_data_outside)
+                ratio_data_outside.Draw("P SAME")
+                
             ROOT.gPad.RedrawAxis()
 
         # Back to pad1 and draw labels and legend
