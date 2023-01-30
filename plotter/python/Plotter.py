@@ -180,6 +180,25 @@ class Plotter:
             sys.exit(1)
 
     ############################################################################
+    # Add a normalization uncertainty 
+    def addNormSystematic(self, bkgname, size):
+        self.__doSystematics = True
+        foundBackground = False
+        for bkg in self.__backgrounds:
+            if bkg["name"] == bkgname:
+                foundBackground = True    
+                up   = bkg["hist"].Clone()
+                down = bkg["hist"].Clone()
+                up.Scale(1.0+size)
+                down.Scale(1.0-size)
+                self.addSystematic(up, down, bkgname+"_norm", bkgname)
+        if not foundBackground:
+            print "[Error]: Trying to add normalization systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
+            sys.exit(1)
+                
+                
+
+    ############################################################################
     # Customize min/max of y axis
     def setCustomYRange(self, min, max):
         self.__ymin = min
