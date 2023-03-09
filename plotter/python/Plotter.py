@@ -14,6 +14,7 @@ Some parameters can be changed in order to customize the plot.
 
 
 import ROOT,os,sys
+import array as arr
 from math                                import sqrt
 from itertools                           import count
 from tWZ.Tools.user                      import plot_directory
@@ -24,6 +25,7 @@ class Plotter:
     def __init__(self, name):
         # Keep track of instances of this class to have unique canvas names
         self.id = next(self._ids)
+        self.debug = False
         
         # A few global drawing options
         ROOT.gStyle.SetLegendBorderSize(0)
@@ -65,7 +67,9 @@ class Plotter:
         self.__xmin = -1                              # min of x-axis
         self.__xmax = -1                              # max of x-axis
         self.__NlegEntries = 0                        # number of entries in legend
-
+        self.__latexTexts = []                        # List of all latex text boxes
+        self.__binning = []                           # Store binning for this plot
+        self.__Nbins = 0                              # Store number of bins
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
     def addBackground(self, hist, legendtext, color):
@@ -86,13 +90,13 @@ class Plotter:
             self.__xmin = hist.GetXaxis().GetBinLowEdge(1)
         else:
             if hist.GetXaxis().GetBinLowEdge(1) != self.__xmin:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
         if self.__xmax == -1:
             self.__xmax = hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2)
         else:
             if hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2) != self.__xmax:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
     ############################################################################
     # Add signals that are displayed as lines
@@ -115,13 +119,13 @@ class Plotter:
             self.__xmin = hist.GetXaxis().GetBinLowEdge(1)
         else:
             if hist.GetXaxis().GetBinLowEdge(1) != self.__xmin:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
         if self.__xmax == -1:
             self.__xmax = hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2)
         else:
             if hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2) != self.__xmax:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
 
     ############################################################################
@@ -148,13 +152,13 @@ class Plotter:
             self.__xmin = hist.GetXaxis().GetBinLowEdge(1)
         else:
             if hist.GetXaxis().GetBinLowEdge(1) != self.__xmin:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
         if self.__xmax == -1:
             self.__xmax = hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2)
         else:
             if hist.GetXaxis().GetBinUpEdge(hist.GetSize()-2) != self.__xmax:
-                print "[Error]: Histogram hast not the same lower bound as those already added."
+                print "[Error]: Histogram has not the same lower bound as those already added."
                 sys.exit(1)
 
     ############################################################################
@@ -205,6 +209,55 @@ class Plotter:
         self.__ymax = max
 
     ############################################################################
+    # Add some text to the plot
+    def addText(self, x, y, text, font=43, size=12):
+        latex = ROOT.TLatex(3.5, 24, text)
+        latex.SetNDC()
+        latex.SetTextAlign(13)
+        latex.SetTextFont(font)
+        latex.SetTextSize(size)
+        latex.SetX(x)
+        latex.SetY(y)
+        self.__latexTexts.append(latex)
+
+    ############################################################################
+    # Return the TGraph with total uncertaintis 
+    def getTotalSystematic(self):
+        return self.__errorhist
+  
+
+    ############################################################################
+    # Private function to set the binning for current plot
+    def __storeBinning(self):
+        binning = []
+        Nbins = 0
+        if self.__hasBackground:
+            Nbins = self.__backgrounds[0]["hist"].GetSize()-2   
+            for i in range(Nbins):
+                bin = i+1
+                binning.append(self.__backgrounds[0]["hist"].GetXaxis().GetBinLowEdge(bin))
+                if bin == Nbins:
+                    binning.append(self.__backgrounds[0]["hist"].GetXaxis().GetBinUpEdge(bin)) 
+        elif self.__hasSignal:
+            Nbins = self.__signals[0]["hist"].GetSize()-2
+            for i in range(Nbins):
+                bin = i+1
+                binning.append(self.__signals[0]["hist"].GetXaxis().GetBinLowEdge(bin))
+                if bin == Nbins:
+                    binning.append(self.__signals[0]["hist"].GetXaxis().GetBinUpEdge(bin))
+        elif self.__hasData:
+            Nbins = self.__data["hist"].GetSize()-2
+            for i in range(Nbins):
+                bin = i+1
+                binning.append(self.__data["hist"].GetXaxis().GetBinLowEdge(bin))
+                if bin == Nbins:
+                    binning.append(self.__data["hist"].GetXaxis().GetBinUpEdge(bin))
+        else:
+            print "[Error]: Binning cannot be extracted since no histograms are defined"
+        self.__binning = binning
+        self.__Nbins = Nbins
+        return   
+    ############################################################################
     # Private function to sort backgrounds by their integral, put them in a stack,
     # and fill legend with the names (in the correct order).
     # Also create a histogram with all backgrounds added.
@@ -238,8 +291,7 @@ class Plotter:
     # Private, add up all sys variations and MC stat
     # Use central for up/down if no Systematics are set
     def __getTotalUncertainty(self):
-        Nbins = self.__bkgtotal.GetSize()-2
-        for i in range(Nbins):
+        for i in range(self.__Nbins):
             bin = i+1
             bincenter = self.__bkgtotal.GetXaxis().GetBinCenter(bin)
             bincontent = self.__bkgtotal.GetBinContent(bin)
@@ -271,9 +323,8 @@ class Plotter:
     ############################################################################
     # Private, create the ratio plot
     def __getRatio(self, h1, h2):
-        ratio = h1.Clone()
-        Nbins = ratio.GetSize()-2
-        for i in range(Nbins):
+        ratio = ROOT.TH1F("ratio", "ratio", self.__Nbins, arr.array('d',self.__binning))
+        for i in range(self.__Nbins):
             bin=i+1
             if h2.GetBinContent(bin)==0:
                 r=-1
@@ -287,7 +338,7 @@ class Plotter:
     ############################################################################
     # Private, create the ratio uncertainty plot
     def __getRatioUncert(self, errorgraph):
-        ratio = errorgraph.Clone()
+        ratio = ROOT.TGraphAsymmErrors() 
         Npoints = errorgraph.GetN()
         for i in range(Npoints):
             point=i+1
@@ -311,10 +362,9 @@ class Plotter:
         return ratio
     ############################################################################
     # Private, create the ratio plot
-    def __getRatioLine(self, h1):
-        line = h1.Clone()
-        Nbins = line.GetSize()-2
-        for i in range(Nbins):
+    def __getRatioLine(self):
+        line = ROOT.TH1F("line", "line", self.__Nbins, arr.array('d',self.__binning))
+        for i in range(self.__Nbins):
             bin=i+1
             line.SetBinContent(bin,1.0)
             line.SetBinError(bin,0.0)
@@ -387,6 +437,15 @@ class Plotter:
         else:
             hist.GetXaxis().SetLabelSize(0.)
             hist.GetYaxis().SetLabelSize(0.)
+            
+    ############################################################################
+    # Private, set draw options for the error band
+    def __setUncertDrawOptions(self, hist):
+        self.__setDrawOptions(hist)
+        hist.SetFillStyle(3245)
+        hist.SetFillColor(13)
+        hist.SetLineWidth(0)
+        hist.SetMarkerStyle(0)
 
     ############################################################################
     # Private, set draw options for the ratio
@@ -428,10 +487,8 @@ class Plotter:
         # even if it would reach into the plot-
         # To solve this, an additional histogram is drawn
         (ymin, ymax) = self.ratiorange
-        ratio_outside = ratio.Clone()
-        ratio_outside.Reset()
-        Nbins = ratio.GetSize()-2
-        for i in range(Nbins):
+        ratio_outside = ROOT.TH1F("ratio_outside", "ratio_outside", self.__Nbins, arr.array('d',self.__binning))
+        for i in range(self.__Nbins):
             bin = i+1
             central = ratio.GetBinContent(bin)
             error = ratio.GetBinError(bin)
@@ -459,15 +516,16 @@ class Plotter:
             ratio_outside.SetBinError(bin, error_new)
         return ratio_outside                
 
-    def getTotalSystematic(self):
-        return self.__errorhist
+
     ############################################################################
     # This function draws and saves the final plot.
     # It takes care of which objects exist (backgrounds, signals, data) and
     # all cosmetics are steered from here
     def draw(self):
-        # c = ROOT.TCanvas("c", "c", 600, 600)
-        c = ROOT.TCanvas("c"+str(self.id), "c"+str(self.id), 600, 600)
+        if self.debug: print "Storebinning"
+        self.__storeBinning()
+        if self.debug: print "Create canvas and pads"
+        canvas = ROOT.TCanvas("canvas"+str(self.id), "canvas"+str(self.id), 600, 600)
         pady1 = 0.31 if self.drawRatio else 0.0
         pad1 = ROOT.TPad("pad1", "pad1", 0, pady1, 1, 1.0)
         if self.drawRatio: pad1.SetBottomMargin(0.02)
@@ -476,11 +534,21 @@ class Plotter:
         pad1.SetLeftMargin(0.19)
         pad1.SetRightMargin(0.05)
         pad1.Draw()
+        
+        if self.drawRatio:
+            pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
+            pad2.SetLeftMargin(0.19)
+            pad2.SetRightMargin(0.05)
+            pad2.SetTopMargin(0)
+            pad2.SetBottomMargin(0.38)
+            pad2.Draw()
+        
         pad1.cd()
         if self.log:
             self.__ymin = 0.0011*self.__ymax
             self.yfactor *= 100
             pad1.SetLogy()
+        if self.debug: print "Set up legends and draw"
         self.legend = ROOT.TLegend(.6+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075,.8+self.legshift[2],.85+self.legshift[3])
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
@@ -488,27 +556,25 @@ class Plotter:
         if self.__hasBackground:
             self.__buildStack()
             self.__setDrawOptions(self.__backgrounds[0]["hist"])
+            if self.debug: print "Draw backgrounds"
             self.__backgrounds[0]["hist"].Draw("HIST")
             histdrawn = True
             self.__stack.Draw("HIST SAME")
             # Uncertainty on MC
             self.__getTotalUncertainty()
-            self.__setDrawOptions(self.__errorhist)
-            self.__errorhist.SetFillStyle(3245)
-            self.__errorhist.SetFillColor(13)
-            self.__errorhist.SetLineWidth(0)
-            self.__errorhist.SetMarkerStyle(0)
+            self.__setUncertDrawOptions(self.__errorhist)
             self.__errorhist.Draw("E2 HIST SAME")
             self.legend.AddEntry(self.__errorhist, "Total uncertainty","f")
         if self.__hasSignal:
             for sig in self.__signals:
+                if self.debug: print "Draw signals"
                 self.__setDrawOptions(sig["hist"])
                 self.legend.AddEntry(sig["hist"], sig["name"], "l")
                 if histdrawn: sig["hist"].Draw("HIST SAME")
                 else:         sig["hist"].Draw("HIST ")
                 histdrawn = True
-
         if self.__hasData:
+            if self.debug: print "Draw data"
             self.__setDrawOptions(self.__data["hist"])
             if histdrawn: self.__data["hist"].Draw("P SAME")
             else:         self.__data["hist"].Draw("P")
@@ -516,6 +582,7 @@ class Plotter:
 
         # Now draw the ratio pad
         if self.drawRatio:
+            if self.debug: print "Set up axis for ratio"
             axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"")
             if self.log:
                 axis = ROOT.TGaxis( self.__xmin, self.__ymin, self.__xmin, self.yfactor*self.__ymax, self.__ymin, self.yfactor*self.__ymax, 505,"G")
@@ -525,25 +592,23 @@ class Plotter:
             axis.SetNdivisions(505)
             if self.log:
                 axis.SetNdivisions(510)
-
             axis.Draw()
-            c.cd()
-            pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
-            pad2.SetLeftMargin(0.19)
-            pad2.SetRightMargin(0.05)
-            pad2.SetTopMargin(0)
-            pad2.SetBottomMargin(0.38)
-            pad2.Draw()
+
+            if self.debug: print "Go into ratio pad"
             pad2.cd()
-            ratioline = self.__getRatioLine(self.__bkgtotal)
+            if self.debug: print "Draw ratio line"
+            ratioline = self.__getRatioLine()
             self.__setRatioDrawOptions(ratioline)
             ratioline.SetFillColor(0)
             ratioline.SetLineColor(15)
             ratioline.SetLineWidth(2)
             ratioline.Draw("HIST")
+            if self.debug: print "Draw ratio error band"
             ratio_uncert = self.__getRatioUncert(self.__errorhist)
+            self.__setUncertDrawOptions(ratio_uncert)
             ratio_uncert.Draw("E2 SAME")
             if self.__hasSignal:
+                if self.debug: print "Draw signal ratios"
                 ratios_sig = []
                 for sig in self.__signals:
                     ratios_sig.append(self.__getRatio(sig["hist"], self.__bkgtotal))
@@ -551,16 +616,19 @@ class Plotter:
                     self.__setRatioDrawOptions(r)
                     r.Draw("HIST SAME")
             if self.__hasData:
+                if self.debug: print "Draw data ratio"
                 ratio_data = self.__getRatio(self.__data["hist"], self.__bkgtotal)
                 self.__setRatioDrawOptions(ratio_data)
                 ratio_data.Draw("P SAME")
+                if self.debug: print "Draw data ratio outside"
                 ratio_data_outside = self.__getRatioOutside(ratio_data)
                 self.__setRatioOutsideDrawOptions(ratio_data_outside)
                 ratio_data_outside.Draw("P SAME")
                 
             ROOT.gPad.RedrawAxis()
-
+        
         # Back to pad1 and draw labels and legend
+        if self.debug: print "Draw labels"
         pad1.cd()
         CMSlabel = self.__getCMS()
         CMSlabel.Draw()
@@ -572,6 +640,13 @@ class Plotter:
         self.legend.Draw()
         ROOT.gPad.RedrawAxis()
 
+        # Now draw text boxes
+        if self.debug: print "Draw Text"
+        for text in self.__latexTexts:
+            text.Draw()
+        
         # Save plot
+        if self.debug: print "Save plot"
         plotname = os.path.join(self.plot_dir, self.plotname+".pdf")
-        c.Print(plotname)
+        canvas.Print(plotname)
+        
