@@ -37,6 +37,7 @@ class Plotter:
         self.plotname = name                        # Name of the pdf file
         self.plot_dir = plot_directory              # Directory to save in
         self.legend = ROOT.TLegend(.6,.5,.8,.85)    # Legend
+        self.NcolumnsLegend = 1                     # Number of columns in legend
         self.ytitle = "Events"                      # Title Y-axis
         self.xtitle = ""                            # Title X-axis
         self.ratiotitle = "#frac{Data}{SM}"         # Title of ratio
@@ -66,13 +67,19 @@ class Plotter:
         self.__ymax = 0                               # maximum of any histogram
         self.__xmin = -1                              # min of x-axis
         self.__xmax = -1                              # max of x-axis
+        self.__xmin_draw = -1                         # custom x axis range
+        self.__xmax_draw = -1                         # custom x axis range
+        self.__customXrange = False                   # custom x axis range   
         self.__NlegEntries = 0                        # number of entries in legend
         self.__latexTexts = []                        # List of all latex text boxes
         self.__binning = []                           # Store binning for this plot
         self.__Nbins = 0                              # Store number of bins
+
+
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
     def addBackground(self, hist, legendtext, color):
+        if self.debug: print "Add background"
         if self.rebin > 1:
             hist.Rebin(self.rebin)
         self.__hasBackground = True
@@ -101,6 +108,7 @@ class Plotter:
     ############################################################################
     # Add signals that are displayed as lines
     def addSignal(self, hist, legendtext, color):
+        if self.debug: print "Add signal"
         if self.rebin > 1:
             hist.Rebin(self.rebin)        
         self.__hasSignal = True
@@ -132,6 +140,7 @@ class Plotter:
     # Add data that are displayed with markers,
     # only one data histogram is allowed
     def addData(self, hist, legendtext="Data"):
+        if self.debug: print "Add data"
         if self.rebin > 1:
             hist.Rebin(self.rebin)
         self.__NlegEntries += 1
@@ -163,10 +172,14 @@ class Plotter:
 
     ############################################################################
     # Add systematic
-    def addSystematic(self, up, down, sysname, bkgname):
-        if self.rebin > 1:
-            up.Rebin(self.rebin)
-            down.Rebin(self.rebin)            
+    def addSystematic(self, up, down, sysname, bkgname, from_norm=False):
+        if self.debug: print "Add systematic"
+        if not from_norm:
+            # If this function is called from 'addNormSystematic()', do not 
+            # rebin again
+            if self.rebin > 1:
+                up.Rebin(self.rebin)
+                down.Rebin(self.rebin)            
         self.__doSystematics = True
         foundBackground = False
         for bkg in self.__backgrounds:
@@ -195,12 +208,17 @@ class Plotter:
                 down = bkg["hist"].Clone()
                 up.Scale(1.0+size)
                 down.Scale(1.0-size)
-                self.addSystematic(up, down, bkgname+"_norm", bkgname)
+                self.addSystematic(up, down, bkgname+"_norm", bkgname, from_norm=True)
         if not foundBackground:
             print "[Error]: Trying to add normalization systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
             sys.exit(1)
                 
-                
+    ############################################################################
+    # Customize min/max of x axis
+    def setCustomXRange(self, min, max):
+        self.__xmin_draw = min
+        self.__xmax_draw = max    
+        self.__customXrange = True            
 
     ############################################################################
     # Customize min/max of y axis
@@ -378,8 +396,8 @@ class Plotter:
         cmstext.SetTextFont(62)
         if self.drawRatio: cmstext.SetTextSize(0.08)
         else:              cmstext.SetTextSize(0.06)
-        cmstext.SetX(0.24)
-        cmstext.SetY(0.84)
+        cmstext.SetX(0.22)
+        cmstext.SetY(0.85)
         return cmstext
 
     ############################################################################
@@ -388,11 +406,11 @@ class Plotter:
         subtext = ROOT.TLatex(3.5, 24, self.subtext)
         subtext.SetNDC()
         subtext.SetTextAlign(13)
-        subtext.SetX(0.24)
+        subtext.SetX(0.22)
         subtext.SetTextFont(52)
         if self.drawRatio: subtext.SetTextSize(0.06)
         else:              subtext.SetTextSize(0.04)
-        subtext.SetY(0.77)
+        subtext.SetY(0.78)
         return subtext
 
     ############################################################################
@@ -425,6 +443,8 @@ class Plotter:
             hist.GetYaxis().SetNdivisions(505)
         else:
             hist.GetYaxis().SetNdivisions(510)
+        if self.__customXrange:
+            hist.GetXaxis().SetRangeUser(self.__xmin_draw, self.__xmax_draw)
         hist.GetYaxis().SetRangeUser(self.__ymin, self.yfactor*self.__ymax)
         hist.GetXaxis().SetTickLength(0.07)
         hist.GetXaxis().SetNdivisions(505)
@@ -453,6 +473,8 @@ class Plotter:
         (ymin, ymax) = self.ratiorange
         ratio.SetTitle('')
         ratio.GetYaxis().SetTitle(self.ratiotitle)
+        if self.__customXrange:
+            ratio.GetXaxis().SetRangeUser(self.__xmin_draw, self.__xmax_draw)
         ratio.GetYaxis().SetRangeUser(ymin, ymax)
         ratio.GetYaxis().SetNdivisions(505)
         ratio.GetYaxis().CenterTitle()
@@ -522,7 +544,7 @@ class Plotter:
     # It takes care of which objects exist (backgrounds, signals, data) and
     # all cosmetics are steered from here
     def draw(self):
-        if self.debug: print "Storebinning"
+        if self.debug: print "Store binning"
         self.__storeBinning()
         if self.debug: print "Create canvas and pads"
         canvas = ROOT.TCanvas("canvas"+str(self.id), "canvas"+str(self.id), 600, 600)
@@ -550,6 +572,8 @@ class Plotter:
             pad1.SetLogy()
         if self.debug: print "Set up legends and draw"
         self.legend = ROOT.TLegend(.6+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075,.8+self.legshift[2],.85+self.legshift[3])
+        if self.NcolumnsLegend > 1:
+            self.legend.SetNColumns(self.NcolumnsLegend)
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
             self.legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
