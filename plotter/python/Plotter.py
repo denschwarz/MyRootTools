@@ -26,7 +26,7 @@ class Plotter:
         # Keep track of instances of this class to have unique canvas names
         self.id = next(self._ids)
         self.debug = False
-        
+
         # A few global drawing options
         ROOT.gStyle.SetLegendBorderSize(0)
         ROOT.gStyle.SetPadTickX(1)
@@ -36,8 +36,7 @@ class Plotter:
         # Some parameters that can be changed
         self.plotname = name                        # Name of the pdf file
         self.plot_dir = plot_directory              # Directory to save in
-        self.legend = ROOT.TLegend(.6,.5,.8,.85)    # Legend
-        self.NcolumnsLegend = 1                     # Number of columns in legend
+        self.NcolumnsLegend = 2                     # Number of columns in legend
         self.ytitle = "Events"                      # Title Y-axis
         self.xtitle = ""                            # Title X-axis
         self.ratiotitle = "#frac{Data}{SM}"         # Title of ratio
@@ -51,6 +50,7 @@ class Plotter:
         self.legshift = (0., 0., 0., 0.)            # shift the Legend coordinates (x1, y1, x2, y2)
 
         # Internal parameters that are set automatically
+        self.__legend = ROOT.TLegend()                # Legend
         self.__bkgtotal = ROOT.TH1F()                 # Hist for sum of backgrounds
         self.__errorhist = ROOT.TGraphAsymmErrors()   # Hist for sys uncert
         self.__hasData = False                        # Keep track if date have been added
@@ -69,12 +69,12 @@ class Plotter:
         self.__xmax = -1                              # max of x-axis
         self.__xmin_draw = -1                         # custom x axis range
         self.__xmax_draw = -1                         # custom x axis range
-        self.__customXrange = False                   # custom x axis range   
+        self.__customXrange = False                   # custom x axis range
         self.__NlegEntries = 0                        # number of entries in legend
         self.__latexTexts = []                        # List of all latex text boxes
         self.__binning = []                           # Store binning for this plot
         self.__Nbins = 0                              # Store number of bins
-
+        self.__ratioCounter = 0                       # keep track of number of ratios
 
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
@@ -107,10 +107,10 @@ class Plotter:
                 sys.exit(1)
     ############################################################################
     # Add signals that are displayed as lines
-    def addSignal(self, hist, legendtext, color):
+    def addSignal(self, hist, legendtext, color, lineStyle=1):
         if self.debug: print "Add signal"
         if self.rebin > 1:
-            hist.Rebin(self.rebin)        
+            hist.Rebin(self.rebin)
         self.__hasSignal = True
         self.__NlegEntries += 1
         sig = {}
@@ -119,6 +119,9 @@ class Plotter:
         sig["hist"].SetFillColorAlpha(ROOT.kWhite, 0.0)
         sig["hist"].SetLineColor(color)
         sig["hist"].SetLineWidth(2)
+        sig["hist"].SetLineStyle(lineStyle)
+        sig["color"] = color
+        sig["linestyle"] = lineStyle
         self.__signals.append(sig)
         if hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
@@ -175,11 +178,11 @@ class Plotter:
     def addSystematic(self, up, down, sysname, bkgname, from_norm=False):
         if self.debug: print "Add systematic"
         if not from_norm:
-            # If this function is called from 'addNormSystematic()', do not 
+            # If this function is called from 'addNormSystematic()', do not
             # rebin again
             if self.rebin > 1:
                 up.Rebin(self.rebin)
-                down.Rebin(self.rebin)            
+                down.Rebin(self.rebin)
         self.__doSystematics = True
         foundBackground = False
         for bkg in self.__backgrounds:
@@ -189,21 +192,21 @@ class Plotter:
                 deltaUp.Add(bkg["hist"], -1)
                 deltaDown = down.Clone()
                 deltaDown.Add(bkg["hist"], -1)
-                
+
                 self.__sysDeltas.append( (sysname, bkgname, deltaUp, deltaDown) )
-                self.__sysnames.append(sysname)       
+                self.__sysnames.append(sysname)
         if not foundBackground:
             print "[Error]: Trying to add %s systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
             sys.exit(1)
 
     ############################################################################
-    # Add a normalization uncertainty 
+    # Add a normalization uncertainty
     def addNormSystematic(self, bkgname, size):
         self.__doSystematics = True
         foundBackground = False
         for bkg in self.__backgrounds:
             if bkg["name"] == bkgname:
-                foundBackground = True    
+                foundBackground = True
                 up   = bkg["hist"].Clone()
                 down = bkg["hist"].Clone()
                 up.Scale(1.0+size)
@@ -212,13 +215,13 @@ class Plotter:
         if not foundBackground:
             print "[Error]: Trying to add normalization systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname)
             sys.exit(1)
-                
+
     ############################################################################
     # Customize min/max of x axis
     def setCustomXRange(self, min, max):
         self.__xmin_draw = min
-        self.__xmax_draw = max    
-        self.__customXrange = True            
+        self.__xmax_draw = max
+        self.__customXrange = True
 
     ############################################################################
     # Customize min/max of y axis
@@ -239,10 +242,10 @@ class Plotter:
         self.__latexTexts.append(latex)
 
     ############################################################################
-    # Return the TGraph with total uncertaintis 
+    # Return the TGraph with total uncertaintis
     def getTotalSystematic(self):
         return self.__errorhist
-  
+
 
     ############################################################################
     # Private function to set the binning for current plot
@@ -250,12 +253,12 @@ class Plotter:
         binning = []
         Nbins = 0
         if self.__hasBackground:
-            Nbins = self.__backgrounds[0]["hist"].GetSize()-2   
+            Nbins = self.__backgrounds[0]["hist"].GetSize()-2
             for i in range(Nbins):
                 bin = i+1
                 binning.append(self.__backgrounds[0]["hist"].GetXaxis().GetBinLowEdge(bin))
                 if bin == Nbins:
-                    binning.append(self.__backgrounds[0]["hist"].GetXaxis().GetBinUpEdge(bin)) 
+                    binning.append(self.__backgrounds[0]["hist"].GetXaxis().GetBinUpEdge(bin))
         elif self.__hasSignal:
             Nbins = self.__signals[0]["hist"].GetSize()-2
             for i in range(Nbins):
@@ -274,7 +277,7 @@ class Plotter:
             print "[Error]: Binning cannot be extracted since no histograms are defined"
         self.__binning = binning
         self.__Nbins = Nbins
-        return   
+        return
     ############################################################################
     # Private function to sort backgrounds by their integral, put them in a stack,
     # and fill legend with the names (in the correct order).
@@ -300,7 +303,7 @@ class Plotter:
             self.__stack.Add(hist)
         # Legend has to be filled in reverse order
         for hist, integral, bkgname in reversed(bkg_list):
-            self.legend.AddEntry(hist, bkgname, "f")
+            self.__legend.AddEntry(hist, bkgname, "f")
         # Also set a new ymax
         if self.__stack.GetMaximum() > self.__ymax:
             self.__ymax = self.__stack.GetMaximum()
@@ -318,7 +321,7 @@ class Plotter:
             totalErrSquared_up   = pow(staterr, 2)
             totalErrSquared_down = pow(staterr, 2)
             # Go through all uncertainties and add up shifts connected to the
-            # same sys but different backgrounds 
+            # same sys but different backgrounds
             for sys in self.__sysnames:
                 shift_up = 0
                 shift_down = 0
@@ -340,8 +343,9 @@ class Plotter:
             self.__errorhist.SetPointError(bin, ex_low, ex_up, sqrt(totalErrSquared_down), sqrt(totalErrSquared_up))
     ############################################################################
     # Private, create the ratio plot
-    def __getRatio(self, h1, h2):
-        ratio = ROOT.TH1F("ratio", "ratio", self.__Nbins, arr.array('d',self.__binning))
+    def __getRatio(self, h1, h2, color=None, linestyle=1):
+        self.__ratioCounter += 1
+        ratio = ROOT.TH1F("ratio"+str(self.__ratioCounter), "ratio", self.__Nbins, arr.array('d',self.__binning))
         for i in range(self.__Nbins):
             bin=i+1
             if h2.GetBinContent(bin)==0:
@@ -352,11 +356,14 @@ class Plotter:
                 e = h1.GetBinError(bin)/h2.GetBinContent(bin)
             ratio.SetBinContent(bin,r)
             ratio.SetBinError(bin,e)
+        if color is not None:
+            ratio.SetLineColor(color)
+        ratio.SetLineStyle(linestyle)
         return ratio
     ############################################################################
     # Private, create the ratio uncertainty plot
     def __getRatioUncert(self, errorgraph):
-        ratio = ROOT.TGraphAsymmErrors() 
+        ratio = ROOT.TGraphAsymmErrors()
         Npoints = errorgraph.GetN()
         for i in range(Npoints):
             point=i+1
@@ -366,14 +373,14 @@ class Plotter:
             Yval = float(d2)
             eX_hi = errorgraph.GetErrorXhigh(point)
             eX_lo = errorgraph.GetErrorXlow(point)
-                        
+
             if Yval==0:
                 eY_hi = 0
-                eY_lo = 0    
+                eY_lo = 0
             else:
                 eY_hi = errorgraph.GetErrorYhigh(point)/Yval
                 eY_lo = errorgraph.GetErrorYlow(point)/Yval
-                
+
             ratio.SetPoint(point, Xval, 1.0)
             ratio.SetPointError(point, eX_lo, eX_hi, eY_lo, eY_hi)
 
@@ -457,7 +464,7 @@ class Plotter:
         else:
             hist.GetXaxis().SetLabelSize(0.)
             hist.GetYaxis().SetLabelSize(0.)
-            
+
     ############################################################################
     # Private, set draw options for the error band
     def __setUncertDrawOptions(self, hist):
@@ -493,18 +500,18 @@ class Plotter:
         ratio.GetXaxis().SetLabelSize(21)
         ratio.GetXaxis().SetLabelOffset(0.035)
         ratio.GetXaxis().SetNdivisions(505)
-        
+
     ############################################################################
-    # Private, set draw options for the ratio that contains outside values        
+    # Private, set draw options for the ratio that contains outside values
     def __setRatioOutsideDrawOptions(self, ratio):
         # first apply usual cosmetics
-        self.__setRatioDrawOptions(ratio) 
-        # Now change marker 
+        self.__setRatioDrawOptions(ratio)
+        # Now change marker
         ratio.SetMarkerSize(0)
-        
+
     ############################################################################
-    # Private, get a ratio histogram that contains values outside the y range        
-    def __getRatioOutside(self, ratio):        
+    # Private, get a ratio histogram that contains values outside the y range
+    def __getRatioOutside(self, ratio):
         # If there are points outside the y range, the error bar is not drawn,
         # even if it would reach into the plot-
         # To solve this, an additional histogram is drawn
@@ -523,7 +530,7 @@ class Plotter:
                 offset = central - ymax
                 central_new = central-offset
                 error_new   = error-offset
-                
+
             elif central < ymin and max > ymin:
                 # if point is below y range:
                 # 1. move central value up to the edge of y range
@@ -536,7 +543,7 @@ class Plotter:
                 error_new   = 0.0
             ratio_outside.SetBinContent(bin, central_new)
             ratio_outside.SetBinError(bin, error_new)
-        return ratio_outside                
+        return ratio_outside
 
 
     ############################################################################
@@ -556,7 +563,7 @@ class Plotter:
         pad1.SetLeftMargin(0.19)
         pad1.SetRightMargin(0.05)
         pad1.Draw()
-        
+
         if self.drawRatio:
             pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
             pad2.SetLeftMargin(0.19)
@@ -564,19 +571,19 @@ class Plotter:
             pad2.SetTopMargin(0)
             pad2.SetBottomMargin(0.38)
             pad2.Draw()
-        
+
         pad1.cd()
         if self.log:
             self.__ymin = 0.0011*self.__ymax
             self.yfactor *= 100
             pad1.SetLogy()
         if self.debug: print "Set up legends and draw"
-        self.legend = ROOT.TLegend(.6+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075,.8+self.legshift[2],.85+self.legshift[3])
+        self.__legend = ROOT.TLegend(.55+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075/2,.9+self.legshift[2],.85+self.legshift[3])
         if self.NcolumnsLegend > 1:
-            self.legend.SetNColumns(self.NcolumnsLegend)
+            self.__legend.SetNColumns(self.NcolumnsLegend)
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
-            self.legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
+            self.__legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
         if self.__hasBackground:
             self.__buildStack()
             self.__setDrawOptions(self.__backgrounds[0]["hist"])
@@ -588,12 +595,12 @@ class Plotter:
             self.__getTotalUncertainty()
             self.__setUncertDrawOptions(self.__errorhist)
             self.__errorhist.Draw("E2 HIST SAME")
-            self.legend.AddEntry(self.__errorhist, "Total uncertainty","f")
+            self.__legend.AddEntry(self.__errorhist, "Total uncertainty","f")
         if self.__hasSignal:
             for sig in self.__signals:
                 if self.debug: print "Draw signals"
                 self.__setDrawOptions(sig["hist"])
-                self.legend.AddEntry(sig["hist"], sig["name"], "l")
+                self.__legend.AddEntry(sig["hist"], sig["name"], "l")
                 if histdrawn: sig["hist"].Draw("HIST SAME")
                 else:         sig["hist"].Draw("HIST ")
                 histdrawn = True
@@ -635,7 +642,7 @@ class Plotter:
                 if self.debug: print "Draw signal ratios"
                 ratios_sig = []
                 for sig in self.__signals:
-                    ratios_sig.append(self.__getRatio(sig["hist"], self.__bkgtotal))
+                    ratios_sig.append(self.__getRatio(sig["hist"], self.__bkgtotal, sig["color"], sig["linestyle"]) )
                 for r in ratios_sig:
                     self.__setRatioDrawOptions(r)
                     r.Draw("HIST SAME")
@@ -648,9 +655,9 @@ class Plotter:
                 ratio_data_outside = self.__getRatioOutside(ratio_data)
                 self.__setRatioOutsideDrawOptions(ratio_data_outside)
                 ratio_data_outside.Draw("P SAME")
-                
+
             ROOT.gPad.RedrawAxis()
-        
+
         # Back to pad1 and draw labels and legend
         if self.debug: print "Draw labels"
         pad1.cd()
@@ -661,16 +668,15 @@ class Plotter:
         if self.lumi is not None:
             lumilable = self.__getLumi()
             lumilable.Draw()
-        self.legend.Draw()
+        self.__legend.Draw()
         ROOT.gPad.RedrawAxis()
 
         # Now draw text boxes
         if self.debug: print "Draw Text"
         for text in self.__latexTexts:
             text.Draw()
-        
+
         # Save plot
         if self.debug: print "Save plot"
         plotname = os.path.join(self.plot_dir, self.plotname+".pdf")
         canvas.Print(plotname)
-        
