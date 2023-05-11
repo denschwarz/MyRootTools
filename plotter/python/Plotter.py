@@ -17,7 +17,6 @@ import ROOT,os,sys
 import array as arr
 from math                                import sqrt
 from itertools                           import count
-from tWZ.Tools.user                      import plot_directory
 
 
 class Plotter:
@@ -35,7 +34,7 @@ class Plotter:
 
         # Some parameters that can be changed
         self.plotname = name                        # Name of the pdf file
-        self.plot_dir = plot_directory              # Directory to save in
+        self.plot_dir = ""                          # Directory to save in
         self.NcolumnsLegend = 2                     # Number of columns in legend
         self.ytitle = "Events"                      # Title Y-axis
         self.xtitle = ""                            # Title X-axis
