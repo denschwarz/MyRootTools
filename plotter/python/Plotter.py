@@ -40,6 +40,7 @@ class Plotter:
         self.xtitle = ""                            # Title X-axis
         self.ratiotitle = "#frac{Data}{SM}"         # Title of ratio
         self.drawRatio = False                      # Draw ratio?
+        self.drawLogo = True                        # Draw CMS (and subtext) label?
         self.subtext = "Work in progress"           # Subtext of CMS label
         self.lumi = None                            # lumi value in label
         self.log = False                            # log scale?
@@ -660,10 +661,11 @@ class Plotter:
         # Back to pad1 and draw labels and legend
         if self.debug: print "Draw labels"
         pad1.cd()
-        CMSlabel = self.__getCMS()
-        CMSlabel.Draw()
-        sublabel = self.__getSubtitle()
-        sublabel.Draw()
+        if self.drawLogo:
+            CMSlabel = self.__getCMS()
+            CMSlabel.Draw()
+            sublabel = self.__getSubtitle()
+            sublabel.Draw()
         if self.lumi is not None:
             lumilable = self.__getLumi()
             lumilable.Draw()
