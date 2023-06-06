@@ -327,8 +327,19 @@ class Plotter:
                 shift_down = 0
                 for (sysname, bkgname, deltaUp, deltaDown) in self.__sysDeltas:
                     if sys == sysname:
-                        shift_up += deltaUp.GetBinContent(bin)
-                        shift_down += deltaDown.GetBinContent(bin)
+                        dup = deltaUp.GetBinContent(bin)
+                        ddown = deltaDown.GetBinContent(bin)
+                        # case where up and down variations are in opposite directions
+                        if dup > 0 and ddown < 0:
+                            shift_up += dup
+                            shift_down += ddown
+                        elif dup < 0 and ddown > 0:
+                            shift_up += ddown
+                            shift_down += dup
+                        elif dup > 0 and ddown > 0:
+                            shift_up += dup if abs(dup) > abs(ddown) else ddown
+                        elif dup < 0 and ddown < 0:
+                            shift_down += dup if abs(dup) > abs(ddown) else ddown
                 totalErrSquared_up += pow(shift_up, 2)
                 totalErrSquared_down += pow(shift_down, 2)
             # if the total error is 0.0, the plotter does weird stuff, so
