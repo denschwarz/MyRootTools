@@ -63,6 +63,7 @@ class Plotter:
         self.__signals = []                           # Hists and infos of all signals
         self.__data = {}                              # Hist and info of data
         self.__stack = ROOT.THStack()                 # Stack for backgrounds
+        self.__autoYrange = True                      # Set Y range automatically?
         self.__ymin = 0                               # minimum of any histogram
         self.__ymax = 0                               # maximum of any histogram
         self.__xmin = -1                              # min of x-axis
@@ -90,7 +91,7 @@ class Plotter:
         bkg["hist"].SetFillColor(color)
         bkg["hist"].SetLineColor(color)
         self.__backgrounds.append(bkg)
-        if hist.GetMaximum() > self.__ymax:
+        if self.__autoYrange and hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
         # Check if min and max bounds of x-axis fit other histograms
         if self.__xmin == -1:
@@ -123,7 +124,7 @@ class Plotter:
         sig["color"] = color
         sig["linestyle"] = lineStyle
         self.__signals.append(sig)
-        if hist.GetMaximum() > self.__ymax:
+        if self.__autoYrange and hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
         # Check if min and max bounds of x-axis fit other histograms
         if self.__xmin == -1:
@@ -157,7 +158,7 @@ class Plotter:
         self.__data["hist"].SetMarkerColor(ROOT.kBlack)
         self.__data["hist"].SetMarkerStyle(8)
         self.__data["hist"].SetMarkerSize(1)
-        if hist.GetMaximum() > self.__ymax:
+        if self.__autoYrange and hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
         # Check if min and max bounds of x-axis fit other histograms
         if self.__xmin == -1:
@@ -228,6 +229,7 @@ class Plotter:
     def setCustomYRange(self, min, max):
         self.__ymin = min
         self.__ymax = max
+        self.__autoYrange = False
 
     ############################################################################
     # Add some text to the plot
@@ -305,7 +307,7 @@ class Plotter:
         for hist, integral, bkgname in reversed(bkg_list):
             self.__legend.AddEntry(hist, bkgname, "f")
         # Also set a new ymax
-        if self.__stack.GetMaximum() > self.__ymax:
+        if self.__autoYrange and self.__stack.GetMaximum() > self.__ymax:
             self.__ymax = self.__stack.GetMaximum()
 
     ############################################################################
