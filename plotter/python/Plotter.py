@@ -79,7 +79,8 @@ class Plotter:
 
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
-    def addBackground(self, hist, legendtext, color):
+    def addBackground(self, hist_, legendtext, color):
+        hist = hist_.Clone()
         if self.debug: print "Add background"
         if self.rebin > 1:
             hist.Rebin(self.rebin)
@@ -108,7 +109,8 @@ class Plotter:
                 sys.exit(1)
     ############################################################################
     # Add signals that are displayed as lines
-    def addSignal(self, hist, legendtext, color, lineStyle=1):
+    def addSignal(self, hist_, legendtext, color, lineStyle=1):
+        hist = hist_.Clone()
         if self.debug: print "Add signal"
         if self.rebin > 1:
             hist.Rebin(self.rebin)
@@ -143,7 +145,8 @@ class Plotter:
     ############################################################################
     # Add data that are displayed with markers,
     # only one data histogram is allowed
-    def addData(self, hist, legendtext="Data"):
+    def addData(self, hist_, legendtext="Data"):
+        hist = hist_.Clone()
         if self.debug: print "Add data"
         if self.rebin > 1:
             hist.Rebin(self.rebin)
@@ -177,6 +180,8 @@ class Plotter:
     ############################################################################
     # Add systematic
     def addSystematic(self, up, down, sysname, bkgname, from_norm=False):
+        up = up_.Clone()
+        down = down_.Clone()
         if self.debug: print "Add systematic"
         if not from_norm:
             # If this function is called from 'addNormSystematic()', do not
