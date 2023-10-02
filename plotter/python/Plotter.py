@@ -179,7 +179,7 @@ class Plotter:
 
     ############################################################################
     # Add systematic
-    def addSystematic(self, up, down, sysname, bkgname, from_norm=False):
+    def addSystematic(self, up_, down_, sysname, bkgname, from_norm=False):
         up = up_.Clone()
         down = down_.Clone()
         if self.debug: print "Add systematic"
