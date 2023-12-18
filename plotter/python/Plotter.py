@@ -433,9 +433,13 @@ class Plotter:
         subtext.SetTextAlign(13)
         subtext.SetX(0.22)
         subtext.SetTextFont(52)
-        if self.drawRatio: subtext.SetTextSize(0.06)
-        else:              subtext.SetTextSize(0.04)
-        subtext.SetY(0.78)
+        if self.drawRatio:
+            subtext.SetTextSize(0.06)
+            subtext.SetY(0.78)
+        else:
+            subtext.SetTextSize(0.04)
+            subtext.SetY(0.80)
+
         return subtext
 
     ############################################################################
