@@ -42,12 +42,14 @@ class Plotter:
         self.drawRatio = False                      # Draw ratio?
         self.drawLogo = True                        # Draw CMS (and subtext) label?
         self.subtext = "Work in progress"           # Subtext of CMS label
+        self.simtext = None                         # Here you can set a "Simulation" label
         self.lumi = None                            # lumi value in label
         self.log = False                            # log scale?
         self.yfactor = 1.7                          # scale y-axis
         self.rebin = 1                              # rebin hist?
         self.ratiorange = 0.5,1.5                   # y-range of ratio plot
         self.legshift = (0., 0., 0., 0.)            # shift the Legend coordinates (x1, y1, x2, y2)
+        self.legtextsize = 0.035                    # Size of legend text
 
         # Internal parameters that are set automatically
         self.__legend = ROOT.TLegend()                # Legend
@@ -426,6 +428,22 @@ class Plotter:
         return cmstext
 
     ############################################################################
+    # Private, set options for the CMS label
+    def __getSimLabel(self):
+        simtext = ROOT.TLatex(3.5, 24, self.simtext)
+        simtext.SetNDC()
+        simtext.SetTextAlign(13)
+        simtext.SetX(0.22)
+        simtext.SetTextFont(52)
+        if self.drawRatio:
+            simtext.SetTextSize(0.06)
+            simtext.SetY(0.78)
+        else:
+            simtext.SetTextSize(0.04)
+            simtext.SetY(0.80)
+        return simtext
+
+    ############################################################################
     # Private, set options for the subtext of the CMS label
     def __getSubtitle(self):
         subtext = ROOT.TLatex(3.5, 24, self.subtext)
@@ -433,12 +451,15 @@ class Plotter:
         subtext.SetTextAlign(13)
         subtext.SetX(0.22)
         subtext.SetTextFont(52)
+        yshift = 0
+        if self.simtext is not None:
+            yshift = -0.05
         if self.drawRatio:
             subtext.SetTextSize(0.06)
-            subtext.SetY(0.78)
+            subtext.SetY(0.78+yshift)
         else:
             subtext.SetTextSize(0.04)
-            subtext.SetY(0.80)
+            subtext.SetY(0.80+yshift)
 
         return subtext
 
@@ -686,11 +707,15 @@ class Plotter:
         if self.drawLogo:
             CMSlabel = self.__getCMS()
             CMSlabel.Draw()
+            if self.simtext is not None:
+                simlabel = self.__getSimLabel()
+                simlabel.Draw()
             sublabel = self.__getSubtitle()
             sublabel.Draw()
         if self.lumi is not None:
             lumilable = self.__getLumi()
             lumilable.Draw()
+        self.__legend.SetTextSize(self.legtextsize)
         self.__legend.Draw()
         ROOT.gPad.RedrawAxis()
 
