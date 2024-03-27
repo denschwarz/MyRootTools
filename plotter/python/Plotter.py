@@ -715,7 +715,8 @@ class Plotter:
         if self.lumi is not None:
             lumilable = self.__getLumi()
             lumilable.Draw()
-        self.__legend.SetTextSize(self.legtextsize)
+        textsize = self.legtextsize if self.drawRatio else self.legtextsize*0.75 
+        self.__legend.SetTextSize(textsize)
         self.__legend.Draw()
         ROOT.gPad.RedrawAxis()
 
