@@ -50,6 +50,8 @@ class Plotter:
         self.ratiorange = 0.5,1.5                   # y-range of ratio plot
         self.legshift = (0., 0., 0., 0.)            # shift the Legend coordinates (x1, y1, x2, y2)
         self.legtextsize = 0.035                    # Size of legend text
+        self.totalUncText = "Total uncertainty"     # Legend text of the uncertainty area
+
 
         # Internal parameters that are set automatically
         self.__legend = ROOT.TLegend()                # Legend
@@ -638,7 +640,7 @@ class Plotter:
             self.__getTotalUncertainty()
             self.__setUncertDrawOptions(self.__errorhist)
             self.__errorhist.Draw("E2 HIST SAME")
-            self.__legend.AddEntry(self.__errorhist, "Total uncertainty","f")
+            self.__legend.AddEntry(self.__errorhist, self.totalUncText,"f")
         if self.__hasSignal:
             for sig in self.__signals:
                 if self.debug: print("Draw signals")
@@ -715,7 +717,7 @@ class Plotter:
         if self.lumi is not None:
             lumilable = self.__getLumi()
             lumilable.Draw()
-        textsize = self.legtextsize if self.drawRatio else self.legtextsize*0.75 
+        textsize = self.legtextsize if self.drawRatio else self.legtextsize*0.75
         self.__legend.SetTextSize(textsize)
         self.__legend.Draw()
         ROOT.gPad.RedrawAxis()
