@@ -139,6 +139,7 @@ class Plotter:
         sig["hist"].SetLineStyle(lineStyle)
         sig["color"] = color
         sig["linestyle"] = lineStyle
+        sig["linewidth"] = lineWidth
         self.__signals.append(sig)
         if self.__autoYrange and hist.GetMaximum() > self.__ymax:
             self.__ymax = hist.GetMaximum()
@@ -284,7 +285,7 @@ class Plotter:
             self.__MarginRight *= factor
         elif label == "left":
             self.__MarginLeft *= factor
-            
+
     ############################################################################
     # Private function to set the binning for current plot
     def __storeBinning(self):
@@ -392,7 +393,7 @@ class Plotter:
             self.__errorhist.SetPointError(bin, ex_low, ex_up, sqrt(totalErrSquared_down), sqrt(totalErrSquared_up))
     ############################################################################
     # Private, create the ratio plot
-    def __getRatio(self, h1, h2, color=None, linestyle=1):
+    def __getRatio(self, h1, h2, color=None, linestyle=1, linewidth=2):
         self.__ratioCounter += 1
         ratio = ROOT.TH1F("ratio"+str(self.__ratioCounter), "ratio", self.__Nbins, arr.array('d',self.__binning))
         for i in range(self.__Nbins):
@@ -408,6 +409,7 @@ class Plotter:
         if color is not None:
             ratio.SetLineColor(color)
         ratio.SetLineStyle(linestyle)
+        ratio.SetLineWidth(linewidth)
         return ratio
     ############################################################################
     # Private, create the ratio uncertainty plot
@@ -416,10 +418,15 @@ class Plotter:
         Npoints = errorgraph.GetN()
         for i in range(Npoints):
             point=i+1
-            d1, d2 = ROOT.Double(0.), ROOT.Double(0.)
+            # d1, d2 = ROOT.Double(0.), ROOT.Double(0.)
+            # errorgraph.GetPoint(point, d1, d2)
+            # Xval = float(d1)
+            # Yval = float(d2)
+            import ctypes
+            d1, d2 = ctypes.c_double(0.0),ctypes.c_double(0.0)
             errorgraph.GetPoint(point, d1, d2)
-            Xval = float(d1)
-            Yval = float(d2)
+            Xval = float(d1.value)
+            Yval = float(d2.value)
             eX_hi = errorgraph.GetErrorXhigh(point)
             eX_lo = errorgraph.GetErrorXlow(point)
 
@@ -548,7 +555,7 @@ class Plotter:
 
     ############################################################################
     # Private, set draw options for the ratio
-    def __setRatioDrawOptions(self, ratio):
+    def __setRatioDrawOptions(self, ratio, isData=False):
         (ymin, ymax) = self.ratiorange
         ratio.SetTitle('')
         ratio.GetYaxis().SetTitle(self.ratiotitle)
@@ -572,6 +579,12 @@ class Plotter:
         ratio.GetXaxis().SetLabelSize(21)
         ratio.GetXaxis().SetLabelOffset(0.035)
         ratio.GetXaxis().SetNdivisions(505)
+        if isData:
+            ratio.SetLineColor(ROOT.kBlack)
+            ratio.SetMarkerColor(ROOT.kBlack)
+            ratio.SetMarkerStyle(8)
+            ratio.SetMarkerSize(1)
+
 
     ############################################################################
     # Private, set draw options for the ratio that contains outside values
@@ -715,14 +728,14 @@ class Plotter:
                 if self.debug: print("Draw signal ratios")
                 ratios_sig = []
                 for sig in self.__signals:
-                    ratios_sig.append(self.__getRatio(sig["hist"], self.__bkgtotal, sig["color"], sig["linestyle"]) )
+                    ratios_sig.append(self.__getRatio(sig["hist"], self.__bkgtotal, sig["color"], sig["linestyle"], sig["linewidth"]) )
                 for r in ratios_sig:
                     self.__setRatioDrawOptions(r)
                     r.Draw("HIST SAME")
             if self.__hasData:
                 if self.debug: print("Draw data ratio")
                 ratio_data = self.__getRatio(self.__data["hist"], self.__bkgtotal)
-                self.__setRatioDrawOptions(ratio_data)
+                self.__setRatioDrawOptions(ratio_data, isData=True)
                 ratio_data.Draw("P SAME")
                 if self.debug: print("Draw data ratio outside")
                 ratio_data_outside = self.__getRatioOutside(ratio_data)
