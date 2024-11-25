@@ -51,6 +51,7 @@ class Plotter:
         self.legshift = (0., 0., 0., 0.)            # shift the Legend coordinates (x1, y1, x2, y2)
         self.legtextsize = 0.035                    # Size of legend text
         self.totalUncText = "Total uncertainty"     # Legend text of the uncertainty area
+        self.divideByWidth = False                  # divide bin content by bin width?
 
 
         # Internal parameters that are set automatically
@@ -80,6 +81,11 @@ class Plotter:
         self.__binning = []                           # Store binning for this plot
         self.__Nbins = 0                              # Store number of bins
         self.__ratioCounter = 0                       # keep track of number of ratios
+        self.__MarginTop = 0.10                       # Pad Margin Top
+        self.__MarginBottom = 0.48                    # Pad Margin Bottom
+        self.__MarginLeft = 0.19                      # Pad Margin Left
+        self.__MarginRight = 0.05                     # Pad Margin Right
+
 
     ############################################################################
     # Add backgrounds that are merged to a stack and displayed as filled areas
@@ -88,6 +94,8 @@ class Plotter:
         if self.debug: print("Add background")
         if self.rebin > 1:
             hist.Rebin(self.rebin)
+        if self.divideByWidth:
+            hist.Scale(1, "width")
         self.__hasBackground = True
         self.__NlegEntries += 1
         bkg = {}
@@ -113,11 +121,13 @@ class Plotter:
                 sys.exit(1)
     ############################################################################
     # Add signals that are displayed as lines
-    def addSignal(self, hist_, legendtext, color, lineStyle=1):
+    def addSignal(self, hist_, legendtext, color, lineStyle=1, lineWidth=2):
         hist = hist_.Clone()
         if self.debug: print("Add signal")
         if self.rebin > 1:
             hist.Rebin(self.rebin)
+        if self.divideByWidth:
+            hist.Scale(1, "width")
         self.__hasSignal = True
         self.__NlegEntries += 1
         sig = {}
@@ -125,7 +135,7 @@ class Plotter:
         sig["hist"] = hist
         sig["hist"].SetFillColorAlpha(ROOT.kWhite, 0.0)
         sig["hist"].SetLineColor(color)
-        sig["hist"].SetLineWidth(2)
+        sig["hist"].SetLineWidth(lineWidth)
         sig["hist"].SetLineStyle(lineStyle)
         sig["color"] = color
         sig["linestyle"] = lineStyle
@@ -154,6 +164,8 @@ class Plotter:
         if self.debug: print("Add data")
         if self.rebin > 1:
             hist.Rebin(self.rebin)
+        if self.divideByWidth:
+            hist.Scale(1, "width")
         self.__NlegEntries += 1
         if self.__hasData:
             print("[Error]: Cannot add Data more than once.")
@@ -193,6 +205,9 @@ class Plotter:
             if self.rebin > 1:
                 up.Rebin(self.rebin)
                 down.Rebin(self.rebin)
+        if self.divideByWidth:
+            up.Scale(1, "width")
+            down.Scale(1, "width")
         self.__doSystematics = True
         foundBackground = False
         for bkg in self.__backgrounds:
@@ -238,6 +253,7 @@ class Plotter:
     def setCustomYRange(self, min, max):
         self.__ymin = min
         self.__ymax = max
+        self.yfactor = 1
         self.__autoYrange = False
 
     ############################################################################
@@ -257,7 +273,18 @@ class Plotter:
     def getTotalSystematic(self):
         return self.__errorhist
 
-
+    ############################################################################
+    # Function to increase margin by a factor
+    def increaseMargin(self, label, factor):
+        if label == "top":
+            self.__MarginTop *= factor
+        elif label == "bottom":
+            self.__MarginBottom *= factor
+        elif label == "right":
+            self.__MarginRight *= factor
+        elif label == "left":
+            self.__MarginLeft *= factor
+            
     ############################################################################
     # Private function to set the binning for current plot
     def __storeBinning(self):
@@ -468,18 +495,18 @@ class Plotter:
     ############################################################################
     # Private, set options for the lumi label
     def __getLumi(self):
-        infotext = "%s fb^{-1} (13 TeV)" %(self.lumi)
+        infotext = "%s fb^{-1} [13 TeV]" %(self.lumi)
         lumitext = ROOT.TLatex(3.5, 24, infotext)
         lumitext.SetNDC()
-        lumitext.SetTextAlign(33)
+        lumitext.SetTextAlign(31)
         lumitext.SetTextFont(42)
-        lumitext.SetX(0.94)
+        lumitext.SetX(1-self.__MarginRight)
         if self.drawRatio:
             lumitext.SetTextSize(0.055)
-            lumitext.SetY(0.971)
+            lumitext.SetY(1-self.__MarginTop+0.013)
         else:
             lumitext.SetTextSize(0.0367)
-            lumitext.SetY(0.951)
+            lumitext.SetY(1-self.__MarginTop+0.013)
         lumitext.Draw()
         return lumitext
 
@@ -540,7 +567,7 @@ class Plotter:
         ratio.GetXaxis().SetTickLength(0.07)
         ratio.GetXaxis().SetTitleSize(25)
         ratio.GetXaxis().SetTitleFont(43)
-        ratio.GetXaxis().SetTitleOffset(4.0)
+        ratio.GetXaxis().SetTitleOffset(5.5)
         ratio.GetXaxis().SetLabelFont(43)
         ratio.GetXaxis().SetLabelSize(21)
         ratio.GetXaxis().SetLabelOffset(0.035)
@@ -603,24 +630,25 @@ class Plotter:
         pady1 = 0.31 if self.drawRatio else 0.0
         pad1 = ROOT.TPad("pad1", "pad1", 0, pady1, 1, 1.0)
         if self.drawRatio: pad1.SetBottomMargin(0.02)
-        else:              pad1.SetBottomMargin(0.12)
-        pad1.SetTopMargin(0.1)
-        pad1.SetLeftMargin(0.19)
-        pad1.SetRightMargin(0.05)
+        else:              pad1.SetBottomMargin(self.__MarginBottom*0.25)
+        pad1.SetTopMargin(self.__MarginTop)
+        pad1.SetLeftMargin(self.__MarginLeft)
+        pad1.SetRightMargin(self.__MarginRight)
         pad1.Draw()
 
         if self.drawRatio:
             pad2 = ROOT.TPad("pad2", "pad2", 0, 0.05, 1, 0.3)
-            pad2.SetLeftMargin(0.19)
-            pad2.SetRightMargin(0.05)
+            pad2.SetLeftMargin(self.__MarginLeft)
+            pad2.SetRightMargin(self.__MarginRight)
             pad2.SetTopMargin(0)
-            pad2.SetBottomMargin(0.38)
+            pad2.SetBottomMargin(self.__MarginBottom)
             pad2.Draw()
 
         pad1.cd()
         if self.log:
-            self.__ymin = 0.0011*self.__ymax
-            self.yfactor *= 100
+            if self.__autoYrange:
+                self.__ymin = 0.0011*self.__ymax
+                self.yfactor *= 100
             pad1.SetLogy()
         if self.debug: print("Set up legends and draw")
         self.__legend = ROOT.TLegend(.55+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075/2,.9+self.legshift[2],.85+self.legshift[3])
