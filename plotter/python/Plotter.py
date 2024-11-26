@@ -34,7 +34,7 @@ class Plotter:
 
         # Some parameters that can be changed
         self.plotname = name                        # Name of the pdf file
-        self.plot_dir = ""                          # Directory to save in
+        self.plot_dir = os.getcwd()                 # Directory to save in
         self.NcolumnsLegend = 2                     # Number of columns in legend
         self.ytitle = "Events"                      # Title Y-axis
         self.xtitle = ""                            # Title X-axis
@@ -664,7 +664,7 @@ class Plotter:
                 self.yfactor *= 100
             pad1.SetLogy()
         if self.debug: print("Set up legends and draw")
-        self.__legend = ROOT.TLegend(.55+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075/2,.9+self.legshift[2],.85+self.legshift[3])
+        self.__legend = ROOT.TLegend(.51+self.legshift[0],.85+self.legshift[1]-self.__NlegEntries*0.075/2,.9+self.legshift[2],.85+self.legshift[3])
         if self.NcolumnsLegend > 1:
             self.__legend.SetNColumns(self.NcolumnsLegend)
         histdrawn = False # Keep track if "SAME" option should be used
