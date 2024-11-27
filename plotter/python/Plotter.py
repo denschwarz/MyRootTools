@@ -581,7 +581,7 @@ class Plotter:
         ratio.GetXaxis().SetTitleSize(25)
         ratio.GetXaxis().SetTitleFont(43)
         if self.isPYROOT:
-            ratio.GetXaxis().SetTitleOffset(1.8)
+            ratio.GetXaxis().SetTitleOffset(1.3)
         else:
             ratio.GetXaxis().SetTitleOffset(5.5)
         ratio.GetXaxis().SetLabelFont(43)
