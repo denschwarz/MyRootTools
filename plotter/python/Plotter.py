@@ -26,6 +26,12 @@ class Plotter:
         self.id = next(self._ids)
         self.debug = False
 
+        # Check if plotter is run with pyroot or python and ROOT bindings
+        if sys.version_info[0] > 2:
+            self.isPYROOT = True
+        else:
+            self.isPYROOT = False
+
         # A few global drawing options
         ROOT.gStyle.SetLegendBorderSize(0)
         ROOT.gStyle.SetPadTickX(1)
@@ -574,7 +580,10 @@ class Plotter:
         ratio.GetXaxis().SetTickLength(0.07)
         ratio.GetXaxis().SetTitleSize(25)
         ratio.GetXaxis().SetTitleFont(43)
-        ratio.GetXaxis().SetTitleOffset(5.5)
+        if self.isPYROOT:
+            ratio.GetXaxis().SetTitleOffset(1.8)
+        else:
+            ratio.GetXaxis().SetTitleOffset(5.5)
         ratio.GetXaxis().SetLabelFont(43)
         ratio.GetXaxis().SetLabelSize(21)
         ratio.GetXaxis().SetLabelOffset(0.035)

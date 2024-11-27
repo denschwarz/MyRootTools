@@ -15,6 +15,7 @@ for drawRatio in [True, False]:
     plotname = "TESTPLOT_RATIO" if drawRatio else "TESTPLOT"
     p = Plotter(plotname)
     p.drawRatio = drawRatio
+    p.ratiorange = 0.2, 1.8
     p.xtitle = "p_{T}"
     # Add Backgrounds, those will be stacked
     p.addBackground(hist1, "Background 1", ROOT.kAzure+7)
