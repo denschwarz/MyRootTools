@@ -37,6 +37,7 @@ class Plotter:
         ROOT.gStyle.SetPadTickX(1)
         ROOT.gStyle.SetPadTickY(1)
         ROOT.gStyle.SetOptStat(0)
+        ROOT.gStyle.SetEndErrorSize(0)
 
         # Some parameters that can be changed
         self.plotname = name                        # Name of the pdf file
@@ -58,7 +59,8 @@ class Plotter:
         self.legtextsize = 0.035                    # Size of legend text
         self.totalUncText = "Total uncertainty"     # Legend text of the uncertainty area
         self.divideByWidth = False                  # divide bin content by bin width?
-
+        self.horizontalErrors = False               # show horizontal error bars for data?
+        self.logoAbovePlot = False                  # Put CMS logo above pad?
 
         # Internal parameters that are set automatically
         self.__legend = ROOT.TLegend()                # Legend
@@ -354,6 +356,22 @@ class Plotter:
             self.__ymax = self.__stack.GetMaximum()
 
     ############################################################################
+    # Convert data hist into TGraph in order to also display horizontal error bars
+    def __convertToTGraph(self, hist):
+        graph = ROOT.TGraphErrors(self.__Nbins)
+        for i in range(self.__Nbins):
+            bin = i+1
+            bincenter = hist.GetXaxis().GetBinCenter(bin)
+            binwidth = hist.GetXaxis().GetBinWidth(bin)
+            content = hist.GetBinContent(bin)
+            error = hist.GetBinError(bin)
+            graph.SetPoint(i, bincenter, content)
+            graph.SetPointError(i, binwidth/2., error)
+        self.__setDrawOptions(graph)
+        return graph
+
+
+    ############################################################################
     # Private, add up all sys variations and MC stat
     # Use central for up/down if no Systematics are set
     def __getTotalUncertainty(self):
@@ -459,56 +477,80 @@ class Plotter:
     ############################################################################
     # Private, set options for the CMS label
     def __getCMS(self):
+        xpos, ypos = 0.22, 0.85
+        if self.logoAbovePlot:
+            xpos += -0.027
+            if self.drawRatio: ypos += 0.12
+            else             : ypos += 0.10
         cmstext = ROOT.TLatex(3.5, 24, "CMS")
         cmstext.SetNDC()
         cmstext.SetTextAlign(13)
         cmstext.SetTextFont(62)
         if self.drawRatio: cmstext.SetTextSize(0.08)
         else:              cmstext.SetTextSize(0.06)
-        cmstext.SetX(0.22)
-        cmstext.SetY(0.85)
+        cmstext.SetX(xpos)
+        cmstext.SetY(ypos)
         return cmstext
 
     ############################################################################
     # Private, set options for the CMS label
     def __getSimLabel(self):
+        xpos, ypos = 0.22, 0.80
+        if not self.logoAbovePlot and self.drawRatio:
+            ypos = 0.78
+        if self.logoAbovePlot and not self.drawRatio:
+            ypos = 0.935
+            xpos = 0.315
+        if self.logoAbovePlot and self.drawRatio:
+            ypos = 0.955
+            xpos = 0.31
+
         simtext = ROOT.TLatex(3.5, 24, self.simtext)
         simtext.SetNDC()
         simtext.SetTextAlign(13)
-        simtext.SetX(0.22)
         simtext.SetTextFont(52)
         if self.drawRatio:
             simtext.SetTextSize(0.06)
-            simtext.SetY(0.78)
         else:
             simtext.SetTextSize(0.04)
-            simtext.SetY(0.80)
+        simtext.SetX(xpos)
+        simtext.SetY(ypos)
         return simtext
 
     ############################################################################
     # Private, set options for the subtext of the CMS label
     def __getSubtitle(self):
+        xpos, ypos = 0.22, 0.80
+        if not self.logoAbovePlot and self.drawRatio:
+            ypos = 0.78
+        if self.logoAbovePlot and not self.drawRatio:
+            ypos = 0.935
+            xpos = 0.315
+        if self.logoAbovePlot and self.drawRatio:
+            ypos = 0.955
+            xpos = 0.31
+
+        if self.simtext is not None:
+            if   self.logoAbovePlot and self.drawRatio:      xpos += 0.18
+            elif self.logoAbovePlot and not self.drawRatio:  xpos += 0.17
+            else:                                            ypos += -0.05
+
         subtext = ROOT.TLatex(3.5, 24, self.subtext)
         subtext.SetNDC()
         subtext.SetTextAlign(13)
-        subtext.SetX(0.22)
         subtext.SetTextFont(52)
-        yshift = 0
-        if self.simtext is not None:
-            yshift = -0.05
         if self.drawRatio:
             subtext.SetTextSize(0.06)
-            subtext.SetY(0.78+yshift)
         else:
             subtext.SetTextSize(0.04)
-            subtext.SetY(0.80+yshift)
-
+        subtext.SetX(xpos)
+        subtext.SetY(ypos)
         return subtext
 
     ############################################################################
     # Private, set options for the lumi label
     def __getLumi(self):
-        infotext = "%s fb^{-1} [13 TeV]" %(self.lumi)
+        infotext = "%s fb^{-1} (13 TeV)" %(self.lumi)
         lumitext = ROOT.TLatex(3.5, 24, infotext)
         lumitext.SetNDC()
         lumitext.SetTextAlign(31)
@@ -516,10 +558,10 @@ class Plotter:
         lumitext.SetX(1-self.__MarginRight)
         if self.drawRatio:
             lumitext.SetTextSize(0.055)
-            lumitext.SetY(1-self.__MarginTop+0.013)
+            lumitext.SetY(1-self.__MarginTop+0.015)
         else:
             lumitext.SetTextSize(0.0367)
-            lumitext.SetY(1-self.__MarginTop+0.013)
+            lumitext.SetY(1-self.__MarginTop+0.015)
         lumitext.Draw()
         return lumitext
 
@@ -546,6 +588,9 @@ class Plotter:
             hist.GetXaxis().SetTitleOffset(1.2)
             hist.GetXaxis().SetLabelFont(43)
             hist.GetXaxis().SetLabelSize(21)
+            hist.GetYaxis().SetTitleSize(0.042)
+            hist.GetYaxis().SetLabelSize(0.038)
+
         else:
             hist.GetXaxis().SetLabelSize(0.)
             hist.GetYaxis().SetLabelSize(0.)
@@ -678,7 +723,8 @@ class Plotter:
             self.__legend.SetNColumns(self.NcolumnsLegend)
         histdrawn = False # Keep track if "SAME" option should be used
         if self.__hasData:
-            self.__legend.AddEntry(self.__data["hist"], self.__data["name"], "pel")
+            legoption_data = "pel" if self.horizontalErrors else "pe"
+            self.__legend.AddEntry(self.__data["hist"], self.__data["name"], legoption_data)
         if self.__hasBackground:
             self.__buildStack()
             self.__setDrawOptions(self.__backgrounds[0]["hist"])
@@ -704,6 +750,9 @@ class Plotter:
             self.__setDrawOptions(self.__data["hist"])
             if histdrawn: self.__data["hist"].Draw("P SAME")
             else:         self.__data["hist"].Draw("P")
+            if self.horizontalErrors:
+                graph_data = self.__convertToTGraph(self.__data["hist"])
+                graph_data.Draw("P SAME")
             histdrawn = True
 
         # Now draw the ratio pad
@@ -750,6 +799,9 @@ class Plotter:
                 ratio_data_outside = self.__getRatioOutside(ratio_data)
                 self.__setRatioOutsideDrawOptions(ratio_data_outside)
                 ratio_data_outside.Draw("P SAME")
+                if self.horizontalErrors:
+                    graph_data_ratio = self.__convertToTGraph(ratio_data)
+                    graph_data_ratio.Draw("P SAME")
 
             ROOT.gPad.RedrawAxis()
 
