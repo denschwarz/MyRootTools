@@ -468,7 +468,7 @@ class Plotter:
     ############################################################################
     # Private, create the ratio plot
     def __getRatioLine(self):
-        line = ROOT.TH1F("line", "line", self.__Nbins, arr.array('d',self.__binning))
+        line = ROOT.TH1F("line"+str(self.id), "line"+str(self.id), self.__Nbins, arr.array('d',self.__binning))
         for i in range(self.__Nbins):
             bin=i+1
             line.SetBinContent(bin,1.0)
@@ -833,3 +833,15 @@ class Plotter:
         if self.debug: print("Save plot")
         plotname = os.path.join(self.plot_dir, self.plotname+".pdf")
         canvas.Print(plotname)
+
+
+###################################################################
+def make2Dplot(hist, plotname, log):
+    c = ROOT.TCanvas("", "", 600, 600)
+    hist.SetTitle("")
+    hist.GetXaxis().SetTitle("#zeta")
+    hist.GetYaxis().SetTitle("#zeta")
+    hist.Draw("COLZ")
+    if log:
+        ROOT.gPad.SetLogz(True)
+    c.Print(plotname)
