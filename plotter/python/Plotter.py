@@ -247,7 +247,7 @@ class Plotter:
                 down.Scale(1.0-size)
                 self.addSystematic(up, down, bkgname+"_norm", bkgname, from_norm=True)
         if not foundBackground:
-            print("[Error]: Trying to add normalization systematic to %s, but could not find a background with name %s" %(sysname, bkgname, bkgname))
+            print("[Error]: Trying to add normalization systematic to %s, but could not find a background with name %s" %(bkgname, bkgname))
             sys.exit(1)
 
     ############################################################################
