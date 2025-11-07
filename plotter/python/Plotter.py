@@ -61,6 +61,7 @@ class Plotter:
         self.divideByWidth = False                  # divide bin content by bin width?
         self.horizontalErrors = False               # show horizontal error bars for data?
         self.logoAbovePlot = False                  # Put CMS logo above pad?
+        self.customBinLabels = None                 # Make custom bin labels
 
         # Internal parameters that are set automatically
         self.__legend = ROOT.TLegend()                # Legend
@@ -324,6 +325,9 @@ class Plotter:
             print("[Error]: Binning cannot be extracted since no histograms are defined")
         self.__binning = binning
         self.__Nbins = Nbins
+        if self.customBinLabels is not None and self.__Nbins != len(self.customBinLabels):
+            raise RuntimeError("Custom label list must have same length as number of bins!")
+
         return
     ############################################################################
     # Private function to sort backgrounds by their integral, put them in a stack,
@@ -473,6 +477,10 @@ class Plotter:
             bin=i+1
             line.SetBinContent(bin,1.0)
             line.SetBinError(bin,0.0)
+            if self.customBinLabels is not None:
+                line.GetXaxis().SetBinLabel(bin, self.customBinLabels[i])
+                line.GetXaxis().LabelsOption("v")
+
         return line
     ############################################################################
     # Private, set options for the CMS label
@@ -550,7 +558,7 @@ class Plotter:
     ############################################################################
     # Private, set options for the lumi label
     def __getLumi(self):
-        infotext = "%s fb^{-1} (13 TeV)" %(self.lumi)
+        infotext = "%s fb^{-1} (13.6 TeV)" %(self.lumi)
         lumitext = ROOT.TLatex(3.5, 24, infotext)
         lumitext.SetNDC()
         lumitext.SetTextAlign(31)
@@ -588,6 +596,12 @@ class Plotter:
             hist.GetXaxis().SetTitleOffset(1.2)
             hist.GetXaxis().SetLabelFont(43)
             hist.GetXaxis().SetLabelSize(21)
+            if self.customBinLabels:
+                for i in range(self.__Nbins):
+                    bin = i+1
+                    hist.GetXaxis().SetBinLabel(bin, self.customBinLabels[i])
+                hist.GetXaxis().SetLabelSize(12)
+                hist.GetXaxis().LabelsOption("v")
             hist.GetYaxis().SetTitleSize(0.042)
             hist.GetYaxis().SetLabelSize(0.038)
 
@@ -631,6 +645,9 @@ class Plotter:
             ratio.GetXaxis().SetTitleOffset(5.5)
         ratio.GetXaxis().SetLabelFont(43)
         ratio.GetXaxis().SetLabelSize(21)
+        if self.customBinLabels:
+            ratio.GetXaxis().SetLabelSize(12)
+
         ratio.GetXaxis().SetLabelOffset(0.035)
         ratio.GetXaxis().SetNdivisions(505)
         if isData:
