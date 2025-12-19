@@ -423,7 +423,7 @@ class Plotter:
     # Private, create the ratio plot
     def __getRatio(self, h1, h2, color=None, linestyle=1, linewidth=2):
         self.__ratioCounter += 1
-        ratio = ROOT.TH1F("ratio"+str(self.__ratioCounter), "ratio", self.__Nbins, arr.array('d',self.__binning))
+        ratio = ROOT.TH1F("ratio"+str(self.id)+str(self.__ratioCounter), "ratio"+str(self.id), self.__Nbins, arr.array('d',self.__binning))
         for i in range(self.__Nbins):
             bin=i+1
             if h2.GetBinContent(bin)==0:
@@ -672,7 +672,7 @@ class Plotter:
         # even if it would reach into the plot-
         # To solve this, an additional histogram is drawn
         (ymin, ymax) = self.ratiorange
-        ratio_outside = ROOT.TH1F("ratio_outside", "ratio_outside", self.__Nbins, arr.array('d',self.__binning))
+        ratio_outside = ROOT.TH1F("ratio_outside"+str(self.id), "ratio_outside"+str(self.id), self.__Nbins, arr.array('d',self.__binning))
         for i in range(self.__Nbins):
             bin = i+1
             central = ratio.GetBinContent(bin)
