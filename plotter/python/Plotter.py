@@ -853,7 +853,7 @@ class Plotter:
 
 
 ###################################################################
-def make2Dplot(hist, plotname, log):
+def make2Dplot(hist, plotname, log=False):
     c = ROOT.TCanvas("", "", 600, 600)
     hist.SetTitle("")
     hist.GetXaxis().SetTitle("#zeta")
@@ -861,4 +861,4 @@ def make2Dplot(hist, plotname, log):
     hist.Draw("COLZ")
     if log:
         ROOT.gPad.SetLogz(True)
-    c.Print(plotname)
+    c.Print(plotname+".pdf")
